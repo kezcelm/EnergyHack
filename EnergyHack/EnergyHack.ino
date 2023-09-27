@@ -1,9 +1,18 @@
 #include <SPI.h>
 #include <mcp2515.h>
 #include "CanFrames.h"
+// #include "CanFrames.cpp"
 
 struct can_frame canMsg;
 MCP2515 mcp2515(10);
+
+void setFrameData(can_frame canFrame, canid_t canId, __u8 canDlc, __u8 *data){
+  canFrame.can_id = canId;
+  canFrame.can_dlc = canDlc;
+  for(int i = 0; i < sizeof(data); ++i) {
+    canFrame.data[i] = data[i];
+  }
+}
 
 void setup() {
   Serial.begin(9600);
@@ -13,11 +22,12 @@ void setup() {
   mcp2515.setBitrate(CAN_500KBPS, MCP_8MHZ);
   mcp2515.setNormalMode();
 
-frame580.can_id = 0x580;
-frame580.can_dlc = 3;
-frame580.data[0] = 0x00;
-frame580.data[1] = 0xC0;
-frame580.data[2] = 0x00;
+setFrameData(frame580, 0x580, 3, data580);
+// frame580.can_id = 0x580;
+// frame580.can_dlc = 3;
+// frame580.data[0] = 0x00;
+// frame580.data[1] = 0xC0;
+// frame580.data[2] = 0x00;
 
 frame581.can_id = 0x581;
 frame581.can_dlc = 7;

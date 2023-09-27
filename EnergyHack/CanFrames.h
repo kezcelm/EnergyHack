@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 struct can_frame frame580;
+__u8 data580[] = {0x00, 0x0C, 0x00};
 struct can_frame frame581;
 struct can_frame frame582;
 struct can_frame frame583;
