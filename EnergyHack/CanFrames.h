@@ -9,13 +9,13 @@ __u8 data580[] = {0x00,
                   0x00};
 
 struct can_frame frame581;
-__u8 data581[] = {0x5A, 
+__u8 data581[] = {0x00, // Battery level - data[0] = 0x64 - 100%
                   0x95, 
                   0x37, 
                   0xE3, 
                   0x3D, 
                   0x04, 
-                  0x42}; // Battery level - data[0] = 0x64 - 100%
+                  0x42}; 
 
 struct can_frame frame582;
 __u8 data582[] = {0x00, 
@@ -91,13 +91,13 @@ __u8 data780[] = {0x00,
                   0x00};
 
 struct can_frame frame781;
-__u8 data781[] = {0x5A, 
+__u8 data781[] = {0x00,  // Battery level - data[0] = 0x64 - 100%
                   0x95, 
                   0x37, 
                   0xE3, 
                   0x3D, 
                   0x04, 
-                  0x42}; // Battery level - data[0] = 0x64 - 100%
+                  0x42};
 
 struct can_frame frame782;
 __u8 data782[] = {0x21, 

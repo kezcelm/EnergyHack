@@ -3,14 +3,32 @@
 #include "CanFrames.h"
 // #include "CanFrames.cpp"
 
+#define BAT_MIN 802
+#define BAT_MAX 1023 // zmierzone 1013
+
 struct can_frame canMsg;
 MCP2515 mcp2515(10);
+int batCheckPin = A0;
+int batCheckValue = 0;
+int batLevel = 0;
 
 void setFrameData(can_frame *canFrame, canid_t canId, __u8 canDlc, __u8 *data){
   canFrame->can_id = canId;
   canFrame->can_dlc = canDlc;
   for(int i = 0; i < canDlc; ++i) {
     canFrame->data[i] = data[i];
+  }
+}
+
+void getBatteryLevel(){
+  batCheckValue = analogRead(batCheckPin);
+  if (batCheckValue < 800){
+    batLevel = 0;
+  }
+  else{
+     batLevel = ceil((((batCheckValue - BAT_MIN) * 100)/(BAT_MAX - BAT_MIN)));
+     frame581.data[0] = batLevel;
+     frame781.data[0] = batLevel;
   }
 }
 
@@ -43,7 +61,7 @@ void setup() {
 }
 
 void loop() {
-
+  getBatteryLevel();
   if (mcp2515.readMessage(&canMsg) == MCP2515::ERROR_OK) {
     switch (canMsg.can_id){
       case 0x40000020:
