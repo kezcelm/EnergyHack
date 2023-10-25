@@ -85,7 +85,7 @@ void setup()
 
 void MCP2515_ISR()
 {
-      = 1;
+    flagRecv  = 1;
 }
 
 void loop()
