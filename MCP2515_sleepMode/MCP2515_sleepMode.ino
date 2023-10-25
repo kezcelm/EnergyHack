@@ -17,6 +17,7 @@
 #include <SPI.h>
 #include "mcp_can.h"
 #include <avr/sleep.h>
+#include "CanFrames.h"
 
 const int SPI_CS_PIN = 10;
 #define CAN_INT 2                                            // Set INT to pin 2
@@ -32,6 +33,13 @@ unsigned long lastBusActivity = millis();
 unsigned char flagRecv = 0;
 unsigned char len = 0;
 unsigned char buf[8];
+
+
+int batCheckPin = A0;                                   // To check battery level
+int batCheckValue = 0;
+unsigned char batLevel = 0;
+#define BAT_MIN 802
+#define BAT_MAX 1023 // full charged, but 1013 when battery is not conneted to bike.
 
 void setup()
 {
@@ -60,6 +68,25 @@ void setup()
       pinMode(RS_OUTPUT, OUTPUT);
       digitalWrite(RS_OUTPUT, LOW);
     }
+
+  setFrameData(&frame580, 0x580, 0, 3, data580);
+  setFrameData(&frame581, 0x581, 0, 7, data581);
+  setFrameData(&frame582, 0x582, 0, 4, data582);
+  setFrameData(&frame583, 0x583, 0, 5, data583);
+  setFrameData(&frame584, 0x584, 0, 4, data584);
+  setFrameData(&frame590, 0x590, 0, 2, data590);
+  setFrameData(&frame591, 0x591, 0, 8, data591);
+  setFrameData(&frame592, 0x592, 0, 6, data592);
+  setFrameData(&frame593, 0x593, 0, 8, data593);
+  setFrameData(&frame594, 0x594, 0, 4, data594);
+  setFrameData(&frame595, 0x595, 0, 6, data595);
+  setFrameData(&frame59F, 0x59F, 0, 1, data59F);
+  setFrameData(&frame780, 0x780, 0, 3, data780);
+  setFrameData(&frame781, 0x781, 0, 7, data781);
+  setFrameData(&frame782, 0x782, 0, 4, data782);
+  setFrameData(&frame783, 0x783, 0, 5, data783);
+  setFrameData(&frame783, 0x784, 0, 3, data784);
+
 }
 
 void MCP2515_ISR()
@@ -82,21 +109,40 @@ void loop()
 
             switch (CAN.getCanId()){
               case 0x40000020:
+                data59F[0] = 0x01;
+                sendCAN(&frame59F);
                 Serial.println("Recive 0x40000020");
+                // CAN.sendMsgBuf(0x580, 0, 3, data580);
+                // CAN.sendMsgBuf(frame580.can_id, frame580.can_ext, frame580.can_dlc, frame580.data);
+                // sendCAN(&frame580);
                 break;
               case 0x40000120:
+                data59F[0] = 0x00;
+                sendCAN(&frame59F);
                 Serial.println("Recive 0x40000120");
                 break;
               case 0x4000042C:
+                sendCAN(&frame590);
+                sendCAN(&frame591);
+                sendCAN(&frame592);
                 Serial.println("Recive 0x4000042C");
                 break;
               case 0x4000022C || 0x4000026C:
+                sendCAN(&frame580);
+                sendCAN(&frame581);
+                sendCAN(&frame583);
                 Serial.println("Recive 0x4000022C or 0x4000026C");
                 break;
               case 0x4000052C:
+                sendCAN(&frame593);
+                sendCAN(&frame594);
+                sendCAN(&frame595);
                 Serial.println("Recive 0x4000052C");
                 break;
               case 0x641:
+                sendCAN(&frame780);
+                sendCAN(&frame781);
+                sendCAN(&frame784);
                 Serial.println("Recive 0x641");
                 break;
               default:
@@ -145,6 +191,30 @@ void loop()
       Serial.println(F("Woke up"));
     }
 }
+
+void sendCAN(can_frame *frame){
+  CAN.sendMsgBuf(frame->can_id, frame->can_ext, frame->can_dlc, frame->data);
+}
+
+void setFrameData(can_frame *canFrame, unsigned long canId, byte canExt, byte canDlc, const byte *data){
+  canFrame->can_id = canId;
+  canFrame->can_ext = canExt;
+  canFrame->can_dlc = canDlc;
+  canFrame->data = data;
+}
+
+void getBatteryLevel(){
+  batCheckValue = analogRead(batCheckPin);
+  if (batCheckValue < BAT_MIN){
+    batLevel = 0;
+  }
+  else{
+     batLevel = ceil((((batCheckValue - BAT_MIN) * 100)/(BAT_MAX - BAT_MIN)));
+     data581[0] = batLevel;
+     data781[0] = batLevel;
+  }
+}
+
 
 /*********************************************************************************************************
   END FILE
