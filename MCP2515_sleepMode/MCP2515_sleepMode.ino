@@ -27,7 +27,7 @@ const int SPI_CS_PIN = 10;
 
 MCP_CAN CAN(SPI_CS_PIN);                                    // Set CS pin
                              
-#define KEEP_AWAKE_TIME 20000                                  // time the controller will stay awake after the last activity on the bus (in ms)
+#define KEEP_AWAKE_TIME 2000                                // time the controller will stay awake after the last activity on the bus (in ms)
 unsigned long lastBusActivity = millis();
 
 unsigned char flagRecv = 0;
@@ -45,13 +45,6 @@ void setup()
 {
     Serial.begin(9600);
     CAN.begin(CAN_500KBPS, MCP_8MHz);
-    // while (CAN_OK != CAN.begin(CAN_500KBPS, MCP_8MHz))       // init can bus : baudrate = 500k
-    // {
-    //     Serial.println("CAN BUS Shield init fail");
-    //     Serial.println(" Init CAN BUS Shield again");
-    //     delay(100);
-    // }
-    // Serial.println("CAN BUS Shield init ok!");
 
     // attach interrupt
     pinMode(CAN_INT, INPUT);
@@ -69,9 +62,7 @@ void setup()
       digitalWrite(RS_OUTPUT, LOW);
     }
 
-
   // Initiate CAN data
-  
   setFrameData(&frame580, 0x580, 0, 3, data580);
   setFrameData(&frame581, 0x581, 0, 7, data581);
   setFrameData(&frame582, 0x582, 0, 4, data582);
@@ -94,7 +85,7 @@ void setup()
 
 void MCP2515_ISR()
 {
-    flagRecv = 1;
+      = 1;
 }
 
 void loop()
@@ -146,7 +137,6 @@ void loop()
     } else if(millis() > lastBusActivity + KEEP_AWAKE_TIME) 
     {
       // Put MCP2515 into sleep mode
-      // Serial.println(F("CAN sleep"));
       CAN.sleep();
       
       // Put the transceiver into standby (by pulling Rs high):
@@ -154,12 +144,6 @@ void loop()
         CAN.mcpDigitalWrite(RS_OUTPUT, HIGH);
       else 
         digitalWrite(RS_OUTPUT, HIGH);
-      
-      // Put the MCU to sleep
-      // Serial.println(F("MCU sleep"));
-
-      // Clear serial buffers before sleeping
-      //Serial.flush();
 
       cli(); // Disable interrupts
       if(!flagRecv) // Make sure we havn't missed an interrupt between the check above and now. If an interrupt happens between now and sei()/sleep_cpu() then sleep_cpu() will immediately wake up again
@@ -181,14 +165,11 @@ void loop()
         CAN.mcpDigitalWrite(RS_OUTPUT, LOW);
       else 
         digitalWrite(RS_OUTPUT, LOW);
-
-      // Serial.println(F("Woke up"));
     }
 }
 
 void sendCAN(can_frame *frame){
   CAN.sendMsgBuf(frame->can_id, frame->can_ext, frame->can_dlc, frame->data);
-  // delay(50);
 }
 
 void setFrameData(can_frame *canFrame, unsigned long canId, byte canExt, byte canDlc, const byte *data){
