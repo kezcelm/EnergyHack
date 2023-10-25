@@ -27,7 +27,7 @@ const int SPI_CS_PIN = 10;
 
 MCP_CAN CAN(SPI_CS_PIN);                                    // Set CS pin
                              
-#define KEEP_AWAKE_TIME 200                                  // time the controller will stay awake after the last activity on the bus (in ms)
+#define KEEP_AWAKE_TIME 20000                                  // time the controller will stay awake after the last activity on the bus (in ms)
 unsigned long lastBusActivity = millis();
 
 unsigned char flagRecv = 0;
@@ -44,14 +44,14 @@ unsigned char batLevel = 0;
 void setup()
 {
     Serial.begin(9600);
-
-    while (CAN_OK != CAN.begin(CAN_500KBPS, MCP_8MHz))       // init can bus : baudrate = 500k
-    {
-        Serial.println("CAN BUS Shield init fail");
-        Serial.println(" Init CAN BUS Shield again");
-        delay(100);
-    }
-    Serial.println("CAN BUS Shield init ok!");
+    CAN.begin(CAN_500KBPS, MCP_8MHz);
+    // while (CAN_OK != CAN.begin(CAN_500KBPS, MCP_8MHz))       // init can bus : baudrate = 500k
+    // {
+    //     Serial.println("CAN BUS Shield init fail");
+    //     Serial.println(" Init CAN BUS Shield again");
+    //     delay(100);
+    // }
+    // Serial.println("CAN BUS Shield init ok!");
 
     // attach interrupt
     pinMode(CAN_INT, INPUT);
@@ -109,44 +109,35 @@ void loop()
         {
             // read data,  len: data length, buf: data buf
             CAN.readMsgBuf(&len, buf);
-
+            getBatteryLevel();
             switch (CAN.getCanId()){
-              case 0x40000020:
+              case 0x020: //  0x40000020
                 data59F[0] = 0x01;
                 sendCAN(&frame59F);
-                Serial.println("Recive 0x40000020");
-                // CAN.sendMsgBuf(0x580, 0, 3, data580);
-                // CAN.sendMsgBuf(frame580.can_id, frame580.can_ext, frame580.can_dlc, frame580.data);
-                // sendCAN(&frame580);
                 break;
-              case 0x40000120:
+              case 0x120:
                 data59F[0] = 0x00;
                 sendCAN(&frame59F);
-                Serial.println("Recive 0x40000120");
                 break;
-              case 0x4000042C:
+              case 0x42C:
                 sendCAN(&frame590);
                 sendCAN(&frame591);
                 sendCAN(&frame592);
-                Serial.println("Recive 0x4000042C");
                 break;
-              case 0x4000022C || 0x4000026C:
+              case 0x22C || 0x26C:
                 sendCAN(&frame580);
                 sendCAN(&frame581);
                 sendCAN(&frame583);
-                Serial.println("Recive 0x4000022C or 0x4000026C");
                 break;
-              case 0x4000052C:
+              case 0x52C:
                 sendCAN(&frame593);
                 sendCAN(&frame594);
                 sendCAN(&frame595);
-                Serial.println("Recive 0x4000052C");
                 break;
               case 0x641:
                 sendCAN(&frame780);
                 sendCAN(&frame781);
                 sendCAN(&frame784);
-                Serial.println("Recive 0x641");
                 break;
               default:
                 break;
@@ -155,7 +146,7 @@ void loop()
     } else if(millis() > lastBusActivity + KEEP_AWAKE_TIME) 
     {
       // Put MCP2515 into sleep mode
-      Serial.println(F("CAN sleep"));
+      // Serial.println(F("CAN sleep"));
       CAN.sleep();
       
       // Put the transceiver into standby (by pulling Rs high):
@@ -165,10 +156,10 @@ void loop()
         digitalWrite(RS_OUTPUT, HIGH);
       
       // Put the MCU to sleep
-      Serial.println(F("MCU sleep"));
+      // Serial.println(F("MCU sleep"));
 
       // Clear serial buffers before sleeping
-      Serial.flush();
+      //Serial.flush();
 
       cli(); // Disable interrupts
       if(!flagRecv) // Make sure we havn't missed an interrupt between the check above and now. If an interrupt happens between now and sei()/sleep_cpu() then sleep_cpu() will immediately wake up again
@@ -191,12 +182,13 @@ void loop()
       else 
         digitalWrite(RS_OUTPUT, LOW);
 
-      Serial.println(F("Woke up"));
+      // Serial.println(F("Woke up"));
     }
 }
 
 void sendCAN(can_frame *frame){
   CAN.sendMsgBuf(frame->can_id, frame->can_ext, frame->can_dlc, frame->data);
+  // delay(50);
 }
 
 void setFrameData(can_frame *canFrame, unsigned long canId, byte canExt, byte canDlc, const byte *data){
