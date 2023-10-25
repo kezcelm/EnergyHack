@@ -1,10 +1,11 @@
 #include <SPI.h>
 #include <mcp2515.h>
 #include "CanFrames.h"
-// #include "CanFrames.cpp"
+#include "mcp_can.h"
+#include <avr/sleep.h>
 
 #define BAT_MIN 802
-#define BAT_MAX 1023 // zmierzone 1013
+#define BAT_MAX 1023 // full charged, but 1013 when battery is not conneted to bike.
 
 struct can_frame canMsg;
 MCP2515 mcp2515(10);
@@ -22,7 +23,7 @@ void setFrameData(can_frame *canFrame, canid_t canId, __u8 canDlc, __u8 *data){
 
 void getBatteryLevel(){
   batCheckValue = analogRead(batCheckPin);
-  if (batCheckValue < 800){
+  if (batCheckValue < BAT_MIN){
     batLevel = 0;
   }
   else{
@@ -39,6 +40,7 @@ void setup() {
   mcp2515.reset();
   mcp2515.setBitrate(CAN_500KBPS, MCP_8MHZ);
   mcp2515.setNormalMode();
+  //mcp2515.setSleepMode();
   
   setFrameData(&frame580, 0x580, 3, data580);
   setFrameData(&frame581, 0x581, 7, data581);
