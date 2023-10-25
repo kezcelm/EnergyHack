@@ -69,6 +69,9 @@ void setup()
       digitalWrite(RS_OUTPUT, LOW);
     }
 
+
+  // Initiate CAN data
+  
   setFrameData(&frame580, 0x580, 0, 3, data580);
   setFrameData(&frame581, 0x581, 0, 7, data581);
   setFrameData(&frame582, 0x582, 0, 4, data582);

@@ -40,7 +40,6 @@ void setup() {
   mcp2515.reset();
   mcp2515.setBitrate(CAN_500KBPS, MCP_8MHZ);
   mcp2515.setNormalMode();
-  //mcp2515.setSleepMode();
   
   setFrameData(&frame580, 0x580, 3, data580);
   setFrameData(&frame581, 0x581, 7, data581);
