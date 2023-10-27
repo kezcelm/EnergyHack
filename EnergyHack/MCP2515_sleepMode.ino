@@ -1,19 +1,3 @@
-// demo: CAN Sleep Example - receive
-// by Kai, based on the receive_interrupt example by loovee and the additions from Zak Kemble (https://github.com/coryjfowler/MCP_CAN_lib/pull/10/files)
-// 
-// By setting the MCU, the CAN controller (MCP2515) and the transceiver (MCP2551) into sleep mode, you can reduce 
-// the power consumption of the whole setup from around 50mA down to 240uA (Arduino directly connected to 5V, regulator and 
-// power LED removed). The node will wake up when a new message arrives, process the message and go back to sleep
-// afterwards.
-//
-// Known issues:
-// - Because it takes some time for the controller to wake up, the first message is usually lost. Look at the 
-//   send_sleep example on how to avoid this by sending a special wakeup message before the normal message.
-// - If you only have 2 devices on the CAN bus (the device running this sketch and some other device sending 
-//   messages), you may find that duplicate messages are received when waking up. This is because when 
-//   the MCP2515 wakes up it enters LISTENONLY mode where it does not send ACKs to messages, so the transmitter 
-//   will retransmit the same message a few times. See below for a simple solution to filter duplicate messages out. 
-
 #include <SPI.h>
 #include "mcp_can.h"
 #include <avr/sleep.h>
