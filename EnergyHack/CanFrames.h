@@ -90,6 +90,18 @@ unsigned char data595[] = {0x61,
                   0xAC, 
                   0x79};
 
+struct can_frame frame59A;
+unsigned char data59A[] = {0x9A, 
+                  0x00, 
+                  0x13, 
+                  0x00, 
+                  0x02, 
+                  0x00};
+
+struct can_frame frame59B;
+unsigned char data59B[] = {0x02, 
+                  0x03};
+
 struct can_frame frame59F;
 unsigned char data59F[] = {0x01}; // data[0] = 0x00 or 0x01
 

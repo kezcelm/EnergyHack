@@ -58,6 +58,8 @@ void setup()
   setFrameData(&frame593, 0x593, 0, 8, data593);
   setFrameData(&frame594, 0x594, 0, 4, data594);
   setFrameData(&frame595, 0x595, 0, 6, data595);
+  setFrameData(&frame59A, 0x59A, 0, 6, data59A);
+  setFrameData(&frame59B, 0x59B, 0, 2, data59B);
   setFrameData(&frame59F, 0x59F, 0, 1, data59F);
   setFrameData(&frame780, 0x780, 0, 3, data780);
   setFrameData(&frame781, 0x781, 0, 7, data781);
@@ -99,7 +101,13 @@ void loop()
                 sendCAN(&frame591);
                 sendCAN(&frame592);
                 break;
-              case 0x22C || 0x26C:
+              case 0x22C:
+                sendCAN(&frame580);
+                sendCAN(&frame581);
+                sendCAN(&frame582);
+                sendCAN(&frame583);
+                break;
+              case 0x26C:
                 sendCAN(&frame580);
                 sendCAN(&frame581);
                 sendCAN(&frame583);
@@ -108,6 +116,10 @@ void loop()
                 sendCAN(&frame593);
                 sendCAN(&frame594);
                 sendCAN(&frame595);
+                break;
+              case 0x72C:
+                sendCAN(&frame59A);
+                sendCAN(&frame59B);
                 break;
               case 0x641:
                 sendCAN(&frame780);
