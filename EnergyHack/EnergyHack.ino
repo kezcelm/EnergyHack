@@ -11,7 +11,7 @@ const int SPI_CS_PIN = 10;
 
 MCP_CAN CAN(SPI_CS_PIN);                                    // Set CS pin
                              
-#define KEEP_AWAKE_TIME 2000                                // time the controller will stay awake after the last activity on the bus (in ms)
+#define KEEP_AWAKE_TIME 200                                // time the controller will stay awake after the last activity on the bus (in ms)
 unsigned long lastBusActivity = millis();
 
 unsigned char flagRecv = 0;
@@ -22,8 +22,8 @@ unsigned char buf[8];
 int batCheckPin = A0;                                   // To check battery level
 int batCheckValue = 0;
 unsigned char batLevel = 0;
-#define BAT_MIN 802
-#define BAT_MAX 1023 // full charged, but 1013 when battery is not conneted to bike.
+#define BAT_MIN 680
+#define BAT_MAX 863  // full charged
 
 void setup()
 {
@@ -182,9 +182,10 @@ void getBatteryLevel(){
   }
   else{
      batLevel = ceil((((batCheckValue - BAT_MIN) * 100)/(BAT_MAX - BAT_MIN)));
-     data581[0] = batLevel;
-     data781[0] = batLevel;
   }
+  if (batLevel > 100) {batLevel = 100;}
+  data581[0] = batLevel;
+  data781[0] = batLevel;
 }
 
 

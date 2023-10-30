@@ -4,8 +4,8 @@
 #include "mcp_can.h"
 #include <avr/sleep.h>
 
-#define BAT_MIN 802
-#define BAT_MAX 1023 // full charged, but 1013 when battery is not conneted to bike.
+#define BAT_MIN 680
+#define BAT_MAX 863 // full charged, but 1013 when battery is not conneted to bike.
 
 struct can_frame canMsg;
 MCP2515 mcp2515(10);
