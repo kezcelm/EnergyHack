@@ -2,6 +2,7 @@
 #include "mcp_can.h"
 #include <avr/sleep.h>
 #include "CanFrames.h"
+#include <PinChangeInterrupt.h>
 
 const int SPI_CS_PIN = 10;
 #define CAN_INT 2                                            // Set INT to pin 2
@@ -31,8 +32,8 @@ void setup()
     CAN.begin(CAN_500KBPS, MCP_8MHz);
 
     // attach interrupt
-    pinMode(CAN_INT, INPUT);
-    attachInterrupt(digitalPinToInterrupt(CAN_INT), MCP2515_ISR, FALLING);
+    pinMode(CAN_INT, INPUT_PULLUP);
+    attachPCINT(digitalPinToPCINT(CAN_INT), MCP2515_ISR, FALLING);
 
     CAN.setSleepWakeup(1);                                   // this tells the MCP2515 to wake up on incoming messages
 
