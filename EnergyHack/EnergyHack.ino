@@ -3,6 +3,7 @@
 #include <avr/sleep.h>
 #include "CanFrames.h"
 #include <PinChangeInterrupt.h>
+#include <Battery.h>
 
 const int SPI_CS_PIN = 10;
 #define CAN_INT 2                                            // Set INT to pin 2
@@ -19,7 +20,7 @@ unsigned char flagRecv = 0;
 unsigned char len = 0;
 unsigned char buf[8];
 
-
+Battery battery(32000, 41000, A0);
 int batCheckPin = A0;                                   // To check battery level
 int batCheckValue = 0;
 unsigned char batLevel = 0;
@@ -30,6 +31,7 @@ void setup()
 {
     Serial.begin(9600);
     CAN.begin(CAN_500KBPS, MCP_8MHz);
+	  battery.begin(5170, 9.41);  // 9.4098451042
 
     // attach interrupt
     pinMode(CAN_INT, INPUT_PULLUP);
@@ -82,12 +84,16 @@ void loop()
 
         flagRecv = 0;                   // clear flag
         lastBusActivity = millis();
+        
+        // getBatteryLevel();
+        
+        data781[0] = battery.level();
+        data581[0] = data781[0];
 
         while (CAN_MSGAVAIL == CAN.checkReceive()) 
         {
             // read data,  len: data length, buf: data buf
             CAN.readMsgBuf(&len, buf);
-            getBatteryLevel();
             switch (CAN.getCanId()){
               case 0x020: //  0x40000020
                 data59F[0] = 0x01;
