@@ -1,4 +1,4 @@
- First prototype to connect 3rd party battery instead of Giant EnergyPak.
+How to connect 3rd party battery instead of Giant EnergyPak.
 
  
  <img src="wiring.png" width="512"/>
