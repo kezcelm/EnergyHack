@@ -21,35 +21,15 @@ unsigned char len = 0;
 unsigned char buf[8];
 
 #define BAT_MIN 32000
-#define BAT_MAX 41000
+#define BAT_MAX 41000  // full charged
 Battery battery(BAT_MIN, BAT_MAX, A0);
 unsigned char batLevel = 0;
-
-CanFrame frame580(0x580, 0, 3, *data580);
-CanFrame frame581(0x581, 0, 7, *data581);
-CanFrame frame582(0x582, 0, 4, *data582);
-CanFrame frame583(0x583, 0, 5, *data583);
-CanFrame frame584(0x584, 0, 4, *data584);
-CanFrame frame590(0x590, 0, 2, *data590);
-CanFrame frame591(0x591, 0, 8, *data591);
-CanFrame frame592(0x592, 0, 6, *data592);
-CanFrame frame593(0x593, 0, 8, *data593);
-CanFrame frame594(0x594, 0, 4, *data594);
-CanFrame frame595(0x595, 0, 6, *data595);
-CanFrame frame59A(0x59A, 0, 6, *data59A);
-CanFrame frame59B(0x59B, 0, 2, *data59B);
-CanFrame frame59F(0x59F, 0, 1, *data59F);
-CanFrame frame780(0x780, 0, 3, *data780);
-CanFrame frame781(0x781, 0, 7, *data781);
-CanFrame frame782(0x782, 0, 4, *data782);
-CanFrame frame783(0x783, 0, 5, *data783);
-CanFrame frame784(0x784, 0, 3, *data784);
 
 void setup()
 {
     Serial.begin(9600);
     CAN.begin(CAN_500KBPS, MCP_8MHz);
-	  battery.begin(5170, 9.5);  //9.41 -> 9.4098451042
+	  battery.begin(5170, 9.5);  // 9.41 -> 9.4098451042
 
     // attach interrupt
     pinMode(CAN_INT, INPUT_PULLUP);
@@ -67,6 +47,27 @@ void setup()
       digitalWrite(RS_OUTPUT, LOW);
     }
 
+  // Initiate CAN data
+  setFrameData(&frame580, 0x580, 0, 3, data580);
+  setFrameData(&frame581, 0x581, 0, 7, data581);
+  setFrameData(&frame582, 0x582, 0, 4, data582);
+  setFrameData(&frame583, 0x583, 0, 5, data583);
+  setFrameData(&frame584, 0x584, 0, 4, data584);
+  setFrameData(&frame590, 0x590, 0, 2, data590);
+  setFrameData(&frame591, 0x591, 0, 8, data591);
+  setFrameData(&frame592, 0x592, 0, 6, data592);
+  setFrameData(&frame593, 0x593, 0, 8, data593);
+  setFrameData(&frame594, 0x594, 0, 4, data594);
+  setFrameData(&frame595, 0x595, 0, 6, data595);
+  setFrameData(&frame59A, 0x59A, 0, 6, data59A);
+  setFrameData(&frame59B, 0x59B, 0, 2, data59B);
+  setFrameData(&frame59F, 0x59F, 0, 1, data59F);
+  setFrameData(&frame780, 0x780, 0, 3, data780);
+  setFrameData(&frame781, 0x781, 0, 7, data781);
+  setFrameData(&frame782, 0x782, 0, 4, data782);
+  setFrameData(&frame783, 0x783, 0, 5, data783);
+  setFrameData(&frame783, 0x784, 0, 3, data784);
+
 }
 
 void MCP2515_ISR()
@@ -81,6 +82,8 @@ void loop()
 
         flagRecv = 0;                   // clear flag
         lastBusActivity = millis();
+        
+        // getBatteryLevel();
         batLevel = battery.level();
         data581[0] = batLevel;
         data781[0] = batLevel;
@@ -92,41 +95,41 @@ void loop()
             switch (CAN.getCanId()){
               case 0x020: //  0x40000020
                 data59F[0] = 0x01;
-                frame59F.sendCAN(CAN);
+                sendCAN(&frame59F);
                 break;
               case 0x120:
                 data59F[0] = 0x00;
-                frame59F.sendCAN(CAN);
+                sendCAN(&frame59F);
                 break;
               case 0x42C:
-                frame590.sendCAN(CAN);
-                frame591.sendCAN(CAN);
-                frame592.sendCAN(CAN);
+                sendCAN(&frame590);
+                sendCAN(&frame591);
+                sendCAN(&frame592);
                 break;
               case 0x22C:
-                frame580.sendCAN(CAN);
-                frame581.sendCAN(CAN);
-                frame582.sendCAN(CAN);
-                frame583.sendCAN(CAN);
+                sendCAN(&frame580);
+                sendCAN(&frame581);
+                sendCAN(&frame582);
+                sendCAN(&frame583);
                 break;
               case 0x26C:
-                frame580.sendCAN(CAN);
-                frame581.sendCAN(CAN);
-                frame583.sendCAN(CAN);
+                sendCAN(&frame580);
+                sendCAN(&frame581);
+                sendCAN(&frame583);
                 break;
               case 0x52C:
-                frame593.sendCAN(CAN);
-                frame594.sendCAN(CAN);
-                frame595.sendCAN(CAN);
+                sendCAN(&frame593);
+                sendCAN(&frame594);
+                sendCAN(&frame595);
                 break;
               case 0x72C:
-                frame59A.sendCAN(CAN);
-                frame59B.sendCAN(CAN);
+                sendCAN(&frame59A);
+                sendCAN(&frame59B);
                 break;
               case 0x641:
-                frame780.sendCAN(CAN);
-                frame781.sendCAN(CAN);
-                frame784.sendCAN(CAN);
+                sendCAN(&frame780);
+                sendCAN(&frame781);
+                sendCAN(&frame784);
                 break;
               default:
                 break;
@@ -165,6 +168,19 @@ void loop()
         digitalWrite(RS_OUTPUT, LOW);
     }
 }
+
+void sendCAN(can_frame *frame){
+  CAN.sendMsgBuf(frame->can_id, frame->can_ext, frame->can_dlc, frame->data);
+}
+
+void setFrameData(can_frame *canFrame, unsigned long canId, byte canExt, byte canDlc, const byte *data){
+  canFrame->can_id = canId;
+  canFrame->can_ext = canExt;
+  canFrame->can_dlc = canDlc;
+  canFrame->data = data;
+}
+
+
 /*********************************************************************************************************
   END FILE
 *********************************************************************************************************/
