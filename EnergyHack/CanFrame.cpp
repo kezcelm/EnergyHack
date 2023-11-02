@@ -1,7 +1,6 @@
 
 #include "CanFrame.h"
 #include <Arduino.h>
-// #include "mcp_can.h"
 
 
 CanFrame::CanFrame(unsigned long canId, byte canExt, byte canDlc, const byte *data) {
