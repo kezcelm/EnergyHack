@@ -49,7 +49,7 @@ void setup()
 {
     Serial.begin(9600);
     CAN.begin(CAN_500KBPS, MCP_8MHz);
-	  battery.begin(5170, 9.41);  // 9.4098451042
+	  battery.begin(5170, 9.5);  //9.41 -> 9.4098451042
 
     // attach interrupt
     pinMode(CAN_INT, INPUT_PULLUP);
