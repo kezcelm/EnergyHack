@@ -19,7 +19,7 @@ void CanFrame::sendCAN(MCP_CAN CAN){
 byte data580[] = {0x00, 
                   0xC0, 
                   0x00};
-byte data581[] = {0x64, // Battery level - data[0] = 0x64 - 100%
+byte data581[] = {0x00, // Battery level - data[0] = 0x64 - 100%
                   0x95, 
                   0x37, 
                   0xE3, 
@@ -85,7 +85,7 @@ byte data59F[] = {0x01}; // data[0] = 0x00 or 0x01
 byte data780[] = {0x00, 
                   0xC0, 
                   0x00};
-byte data781[] = {0x64,  // Battery level - data[0] = 0x64 - 100%
+byte data781[] = {0x00,  // Battery level - data[0] = 0x64 - 100%
                   0x95, 
                   0x37, 
                   0xE3, 

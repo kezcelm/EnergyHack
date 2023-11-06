@@ -31,7 +31,8 @@ Battery battery(BAT_MIN, BAT_MAX, A0);
 unsigned char batLevel = 0;
 
 #define BAT_ARR_SIZE 100
-unsigned char batArray[BAT_ARR_SIZE];
+int batArray[BAT_ARR_SIZE];
+// int batArray[BAT_ARR_SIZE]={70,71,72,73,74,75,76,77,78,79};
 
 
 CanFrame frame580(0x580, 0, 3, data580);
@@ -81,9 +82,10 @@ void setup()
     //   digitalWrite(RS_OUTPUT, LOW);
     // }
     // initiate battery array
-    for (int i=0;i<sizeof(batArray)/sizeof( batArray[0]);i++){
-      batArray[i] = battery.level();
-    }
+    // for (int i=0;i<BAT_ARR_SIZE;i++){
+    //   batArray[i] = battery.level();
+    // }
+
 
 }
 
@@ -93,22 +95,19 @@ void MCP2515_ISR()
 }
 
 void loop()
-{    
+{   
 // TODO: uncoment when interupts will works
     // if(flagRecv) 
     // {             // check if get data
 
         flagRecv = 0;                   // clear flag
         lastBusActivity = millis();
-        
-        // batLevel = battery.level();
-        r_left(batArray, sizeof(batArray)/sizeof( batArray[0]));
-        batArray[BAT_ARR_SIZE-1] = battery.level();
+
+        r_left(batArray, BAT_ARR_SIZE);
+        batArray[(BAT_ARR_SIZE-1)] = battery.level();
         batLevel = calculateBattery(batArray);
         *data581 = batLevel;
         *data781 = batLevel;
-
-
 
         while (CAN_MSGAVAIL == CAN.checkReceive()) 
         {
@@ -201,21 +200,19 @@ void loop()
 }
 
 //rotate Left
-void r_left(unsigned char *a,int n) 
-{ 
-  unsigned char tmp=a[0];
+void r_left(int *a,int n) 
+{
   memmove(a,a+1,sizeof(int)*(n-1));
-  a[n-1]=tmp;
 }
 
 //calculate battery level
-unsigned char calculateBattery(unsigned char *ar) 
+int calculateBattery(int *ar) 
 {
-  unsigned char s = 0;
-  for (int i=0;i<sizeof(batArray)/sizeof( batArray[0]);i++){
-    s+=batArray[i];
+  int s = 0;
+  for (int i=0;i<BAT_ARR_SIZE;i++){
+    s+=ar[i];
   }
-  s/=(sizeof(batArray)/sizeof( batArray[0]));
+  s=s/BAT_ARR_SIZE;
   return s;
 }
 /*********************************************************************************************************
