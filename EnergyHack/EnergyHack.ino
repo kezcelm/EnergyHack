@@ -13,12 +13,17 @@ const int SPI_CS_PIN = 10;
 
 MCP_CAN CAN(SPI_CS_PIN);                                    // Set CS pin
                              
-#define KEEP_AWAKE_TIME 200                                // time the controller will stay awake after the last activity on the bus (in ms)
+#define KEEP_AWAKE_TIME 2000                                // time the controller will stay awake after the last activity on the bus (in ms)
 unsigned long lastBusActivity = millis();
 
 unsigned char flagRecv = 0;
 unsigned char len = 0;
 unsigned char buf[8];
+
+int lastLen = -1;
+unsigned char lastBuf[8];                                    // used for duplicate message check below
+unsigned long lastMsgTime = 0;
+#define DUPLICATE_TIMEOUT 20
 
 #define BAT_MIN 32000
 #define BAT_MAX 41000
@@ -50,22 +55,27 @@ void setup()
     Serial.begin(9600);
     CAN.begin(CAN_500KBPS, MCP_8MHz);
 	  battery.begin(5170, 9.5);  //9.41 -> 9.4098451042
-
+    
+    CAN.setMode(MODE_NORMAL);
+    // TODO: uncoment when interupts will works
     // attach interrupt
-    pinMode(CAN_INT, INPUT_PULLUP);
-    attachPCINT(digitalPinToPCINT(CAN_INT), MCP2515_ISR, FALLING);
+    
+    // pinMode(CAN_INT, INPUT_PULLUP);
+    // attachPCINT(digitalPinToPCINT(CAN_INT), MCP2515_ISR, FALLING);
 
-    CAN.setSleepWakeup(1);                                   // this tells the MCP2515 to wake up on incoming messages
+    // CAN.setSleepWakeup(1);                                   // this tells the MCP2515 to wake up on incoming messages
 
     // Pull the Rs pin of the MCP2551 transceiver low to enable it:
-    if(RS_TO_MCP2515) 
-    {
-      CAN.mcpPinMode(MCP_RX0BF, MCP_PIN_OUT);
-      CAN.mcpDigitalWrite(RS_OUTPUT, LOW);
-    } else {
-      pinMode(RS_OUTPUT, OUTPUT);
-      digitalWrite(RS_OUTPUT, LOW);
-    }
+
+
+    // if(RS_TO_MCP2515) 
+    // {
+    //   CAN.mcpPinMode(MCP_RX0BF, MCP_PIN_OUT);
+    //   CAN.mcpDigitalWrite(RS_OUTPUT, LOW);
+    // } else {
+    //   pinMode(RS_OUTPUT, OUTPUT);
+    //   digitalWrite(RS_OUTPUT, LOW);
+    // }
 
 }
 
@@ -75,9 +85,10 @@ void MCP2515_ISR()
 }
 
 void loop()
-{
-    if(flagRecv) 
-    {                                   // check if get data
+{    
+// TODO: uncoment when interupts will works
+    // if(flagRecv) 
+    // {             // check if get data
 
         flagRecv = 0;                   // clear flag
         lastBusActivity = millis();
@@ -89,6 +100,13 @@ void loop()
         {
             // read data,  len: data length, buf: data buf
             CAN.readMsgBuf(&len, buf);
+            // check if this is a duplicate message (including a timeout, so that the same message is accepted again after a while)
+            if((len != lastLen) || (millis() > lastMsgTime + DUPLICATE_TIMEOUT) || (memcmp((const void *)lastBuf, (const void *)buf, sizeof(buf)) != 0))
+            {
+              lastLen = len;
+              memcpy(lastBuf, buf, sizeof(buf));
+              lastMsgTime = millis();
+
             switch (CAN.getCanId()){
               case 0x020: //  0x40000020
                 *data59F = 0x01;
@@ -131,39 +149,41 @@ void loop()
               default:
                 break;
             }
+            }
         }
-    } else if(millis() > lastBusActivity + KEEP_AWAKE_TIME) 
-    {
-      // Put MCP2515 into sleep mode
-      CAN.sleep();
+// TODO: uncoment when interupts will works
+    // } else if(millis() > lastBusActivity + KEEP_AWAKE_TIME) 
+    // { 
+    //   // Put MCP2515 into sleep mode
+    //   CAN.sleep();
       
-      // Put the transceiver into standby (by pulling Rs high):
-      if(RS_TO_MCP2515) 
-        CAN.mcpDigitalWrite(RS_OUTPUT, HIGH);
-      else 
-        digitalWrite(RS_OUTPUT, HIGH);
+    //   // Put the transceiver into standby (by pulling Rs high):
+    //   if(RS_TO_MCP2515) 
+    //     CAN.mcpDigitalWrite(RS_OUTPUT, HIGH);
+    //   else 
+    //     digitalWrite(RS_OUTPUT, HIGH);
 
-      cli(); // Disable interrupts
-      if(!flagRecv) // Make sure we havn't missed an interrupt between the check above and now. If an interrupt happens between now and sei()/sleep_cpu() then sleep_cpu() will immediately wake up again
-      {
-        set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-        sleep_enable();
-        sleep_bod_disable();
-        sei();
-        sleep_cpu();
-        // Now the Arduino sleeps until the next message arrives...
-        sleep_disable();
-      }
-      sei();
+    //   cli(); // Disable interrupts
+    //   if(!flagRecv) // Make sure we havn't missed an interrupt between the check above and now. If an interrupt happens between now and sei()/sleep_cpu() then sleep_cpu() will immediately wake up again
+    //   {
+    //     set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+    //     sleep_enable();
+    //     sleep_bod_disable();
+    //     sei();
+    //     sleep_cpu();
+    //     // Now the Arduino sleeps until the next message arrives...
+    //     sleep_disable();
+    //   }
+    //   sei();
 
-      CAN.wake(); // When the MCP2515 wakes up it will be in LISTENONLY mode, here we put it into the mode it was before sleeping
+    //   CAN.wake(); // When the MCP2515 wakes up it will be in LISTENONLY mode, here we put it into the mode it was before sleeping
 
-      // Wake up the transceiver:
-      if(RS_TO_MCP2515) 
-        CAN.mcpDigitalWrite(RS_OUTPUT, LOW);
-      else 
-        digitalWrite(RS_OUTPUT, LOW);
-    }
+    //   // Wake up the transceiver:
+    //   if(RS_TO_MCP2515) 
+    //     CAN.mcpDigitalWrite(RS_OUTPUT, LOW);
+    //   else 
+    //     digitalWrite(RS_OUTPUT, LOW);
+    // }
 }
 /*********************************************************************************************************
   END FILE
