@@ -30,6 +30,10 @@ unsigned long lastMsgTime = 0;
 Battery battery(BAT_MIN, BAT_MAX, A0);
 unsigned char batLevel = 0;
 
+#define BAT_ARR_SIZE 100
+unsigned char batArray[BAT_ARR_SIZE];
+
+
 CanFrame frame580(0x580, 0, 3, data580);
 CanFrame frame581(0x581, 0, 7, data581);
 CanFrame frame582(0x582, 0, 4, data582);
@@ -76,6 +80,10 @@ void setup()
     //   pinMode(RS_OUTPUT, OUTPUT);
     //   digitalWrite(RS_OUTPUT, LOW);
     // }
+    // initiate battery array
+    for (int i=0;i<sizeof(batArray)/sizeof( batArray[0]);i++){
+      batArray[i] = battery.level();
+    }
 
 }
 
@@ -92,9 +100,15 @@ void loop()
 
         flagRecv = 0;                   // clear flag
         lastBusActivity = millis();
-        batLevel = battery.level();
+        
+        // batLevel = battery.level();
+        r_left(batArray, sizeof(batArray)/sizeof( batArray[0]));
+        batArray[BAT_ARR_SIZE-1] = battery.level();
+        batLevel = calculateBattery(batArray);
         *data581 = batLevel;
         *data781 = batLevel;
+
+
 
         while (CAN_MSGAVAIL == CAN.checkReceive()) 
         {
@@ -107,48 +121,48 @@ void loop()
               memcpy(lastBuf, buf, sizeof(buf));
               lastMsgTime = millis();
 
-            switch (CAN.getCanId()){
-              case 0x020: //  0x40000020
-                *data59F = 0x01;
-                frame59F.sendCAN(CAN);
-                break;
-              case 0x120:
-                *data59F = 0x00;
-                frame59F.sendCAN(CAN);
-                break;
-              case 0x42C:
-                frame590.sendCAN(CAN);
-                frame591.sendCAN(CAN);
-                frame592.sendCAN(CAN);
-                break;
-              case 0x22C:
-                frame580.sendCAN(CAN);
-                frame581.sendCAN(CAN);
-                frame582.sendCAN(CAN);
-                frame583.sendCAN(CAN);
-                break;
-              case 0x26C:
-                frame580.sendCAN(CAN);
-                frame581.sendCAN(CAN);
-                frame583.sendCAN(CAN);
-                break;
-              case 0x52C:
-                frame593.sendCAN(CAN);
-                frame594.sendCAN(CAN);
-                frame595.sendCAN(CAN);
-                break;
-              case 0x72C:
-                frame59A.sendCAN(CAN);
-                frame59B.sendCAN(CAN);
-                break;
-              case 0x641:
-                frame780.sendCAN(CAN);
-                frame781.sendCAN(CAN);
-                frame784.sendCAN(CAN);
-                break;
-              default:
-                break;
-            }
+              switch (CAN.getCanId()){
+                case 0x020: //  0x40000020
+                  *data59F = 0x01;
+                  frame59F.sendCAN(CAN);
+                  break;
+                case 0x120:
+                  *data59F = 0x00;
+                  frame59F.sendCAN(CAN);
+                  break;
+                case 0x42C:
+                  frame590.sendCAN(CAN);
+                  frame591.sendCAN(CAN);
+                  frame592.sendCAN(CAN);
+                  break;
+                case 0x22C:
+                  frame580.sendCAN(CAN);
+                  frame581.sendCAN(CAN);
+                  frame582.sendCAN(CAN);
+                  frame583.sendCAN(CAN);
+                  break;
+                case 0x26C:
+                  frame580.sendCAN(CAN);
+                  frame581.sendCAN(CAN);
+                  frame583.sendCAN(CAN);
+                  break;
+                case 0x52C:
+                  frame593.sendCAN(CAN);
+                  frame594.sendCAN(CAN);
+                  frame595.sendCAN(CAN);
+                  break;
+                case 0x72C:
+                  frame59A.sendCAN(CAN);
+                  frame59B.sendCAN(CAN);
+                  break;
+                case 0x641:
+                  frame780.sendCAN(CAN);
+                  frame781.sendCAN(CAN);
+                  frame784.sendCAN(CAN);
+                  break;
+                default:
+                  break;
+              }
             }
         }
 // TODO: uncoment when interupts will works
@@ -184,6 +198,25 @@ void loop()
     //   else 
     //     digitalWrite(RS_OUTPUT, LOW);
     // }
+}
+
+//rotate Left
+void r_left(unsigned char *a,int n) 
+{ 
+  unsigned char tmp=a[0];
+  memmove(a,a+1,sizeof(int)*(n-1));
+  a[n-1]=tmp;
+}
+
+//calculate battery level
+unsigned char calculateBattery(unsigned char *ar) 
+{
+  unsigned char s = 0;
+  for (int i=0;i<sizeof(batArray)/sizeof( batArray[0]);i++){
+    s+=batArray[i];
+  }
+  s/=(sizeof(batArray)/sizeof( batArray[0]));
+  return s;
 }
 /*********************************************************************************************************
   END FILE
