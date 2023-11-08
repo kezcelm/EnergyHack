@@ -30,9 +30,12 @@ unsigned long lastMsgTime = 0;
 Battery battery(BAT_MIN, BAT_MAX, A0);
 unsigned char batLevel = 0;
 
-#define BAT_ARR_SIZE 100
+#define BAT_ARR_SIZE 64   // must be powero of 2
 int batArray[BAT_ARR_SIZE];
-// int batArray[BAT_ARR_SIZE]={70,71,72,73,74,75,76,77,78,79};
+
+unsigned long actTime = 0;
+unsigned long prevTime = 0;
+bool firstTime = true;
 
 
 CanFrame frame580(0x580, 0, 3, data580);
@@ -81,12 +84,6 @@ void setup()
     //   pinMode(RS_OUTPUT, OUTPUT);
     //   digitalWrite(RS_OUTPUT, LOW);
     // }
-    // initiate battery array
-    // for (int i=0;i<BAT_ARR_SIZE;i++){
-    //   batArray[i] = battery.level();
-    // }
-
-
 }
 
 void MCP2515_ISR()
@@ -96,26 +93,43 @@ void MCP2515_ISR()
 
 void loop()
 {   
+  // if(firstTime){                       // first initiate battery array
+  //   firstTime = false;
+  //   delay(1200);
+  //   for (int i=0;i<BAT_ARR_SIZE;i++){
+  //     batArray[i] = battery.level();
+  //   delay(25);
+  //   }
+  //   batLevel = calculateBattery(batArray);
+  //   *data581 = batLevel;
+  //   *data781 = batLevel;
+  // }
 // TODO: uncoment when interupts will works
     // if(flagRecv) 
     // {             // check if get data
 
+    
+
         flagRecv = 0;                   // clear flag
         lastBusActivity = millis();
 
-        r_left(batArray, BAT_ARR_SIZE);
-        batArray[(BAT_ARR_SIZE-1)] = battery.level();
-        batLevel = calculateBattery(batArray);
-        *data581 = batLevel;
-        *data781 = batLevel;
+        actTime = millis();
+        if (actTime - prevTime >= 250UL){
+          prevTime = actTime;
+          r_left(batArray, BAT_ARR_SIZE);
+          batArray[(BAT_ARR_SIZE-1)] = battery.level();
+          batLevel = calculateBattery(batArray);
+          *data581 = batLevel;
+          *data781 = batLevel;
+        }
 
         while (CAN_MSGAVAIL == CAN.checkReceive()) 
         {
             // read data,  len: data length, buf: data buf
             CAN.readMsgBuf(&len, buf);
             // check if this is a duplicate message (including a timeout, so that the same message is accepted again after a while)
-            if((len != lastLen) || (millis() > lastMsgTime + DUPLICATE_TIMEOUT) || (memcmp((const void *)lastBuf, (const void *)buf, sizeof(buf)) != 0))
-            {
+            // if((len != lastLen) || (millis() > lastMsgTime + DUPLICATE_TIMEOUT) || (memcmp((const void *)lastBuf, (const void *)buf, sizeof(buf)) != 0))
+            // {
               lastLen = len;
               memcpy(lastBuf, buf, sizeof(buf));
               lastMsgTime = millis();
@@ -162,7 +176,7 @@ void loop()
                 default:
                   break;
               }
-            }
+            // }
         }
 // TODO: uncoment when interupts will works
     // } else if(millis() > lastBusActivity + KEEP_AWAKE_TIME) 
@@ -208,12 +222,13 @@ void r_left(int *a,int n)
 //calculate battery level
 int calculateBattery(int *ar) 
 {
-  int s = 0;
+  long level = 0;
   for (int i=0;i<BAT_ARR_SIZE;i++){
-    s+=ar[i];
+    level+=ar[i];
   }
-  s=s/BAT_ARR_SIZE;
-  return s;
+  // level=level/BAT_ARR_SIZE;
+  level = level >> 6;
+  return level;
 }
 /*********************************************************************************************************
   END FILE
