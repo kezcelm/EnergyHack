@@ -126,13 +126,13 @@ void loop()
           r_left(batArray, BAT_ARR_SIZE);                       // shift battery measurement array
           batArray[BAT_ARR_SIZE-1] = battery.level();           // add current measurement to last element 
 
-          // if (motorPower==0)
+          // if (motorPower!=0) // if motor is loaded, allow for voltage drop
           // {
-          //   batArray[BAT_ARR_SIZE-1] = battery.level();
+          //   batArray[BAT_ARR_SIZE-1] = (battery.level()+motorPower/10 > batLevel ? batLevel:battery.level()+motorPower/10);
           // }
           // else
           // {
-          //   batArray[BAT_ARR_SIZE-1] = (battery.level()+motorPower/10 > batLevel ? batLevel:battery.level()+motorPower/10);
+          //   batArray[BAT_ARR_SIZE-1] = battery.level();
           // }
           
           batLevel = calculateAverage(batArray, BAT_ARR_SIZE);  // calculate average
