@@ -124,7 +124,17 @@ void loop()
         {
           prevTime = actTime;
           r_left(batArray, BAT_ARR_SIZE);                       // shift battery measurement array
-          batArray[BAT_ARR_SIZE-1] = battery.level();         // add current measurement to last element 
+          batArray[BAT_ARR_SIZE-1] = battery.level();           // add current measurement to last element 
+
+          // if (motorPower==0)
+          // {
+          //   batArray[BAT_ARR_SIZE-1] = battery.level();
+          // }
+          // else
+          // {
+          //   batArray[BAT_ARR_SIZE-1] = (battery.level()+motorPower/10 > batLevel ? batLevel:battery.level()+motorPower/10);
+          // }
+          
           batLevel = calculateAverage(batArray, BAT_ARR_SIZE);  // calculate average
           *data581 = batLevel;
           *data781 = batLevel;
