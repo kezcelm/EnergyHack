@@ -5,7 +5,10 @@
 #include <PinChangeInterrupt.h>
 #include <Battery.h>
 
+
 const int SPI_CS_PIN = 10;
+
+//used for interupt
 #define CAN_INT 2                                            // Set INT to pin 2
 
 #define RS_TO_MCP2515 true                                   // Set this to false if Rs is connected to your Arduino
@@ -20,24 +23,35 @@ unsigned char flagRecv = 0;
 unsigned char len = 0;
 unsigned char buf[8];
 
+// used for duplicate message check below
 int lastLen = -1;
-unsigned char lastBuf[8];                                    // used for duplicate message check below
+unsigned char lastBuf[8];                                    
 unsigned long lastMsgTime = 0;
 #define DUPLICATE_TIMEOUT 20
 
+// used for check battery level
 #define BAT_MIN 32000
 #define BAT_MAX 41000
 Battery battery(BAT_MIN, BAT_MAX, A0);
 unsigned char batLevel = 0;
 
-#define BAT_ARR_SIZE 64   // must be powero of 2
-int batArray[BAT_ARR_SIZE];
+#define BAT_ARR_SIZE 64   // must be power of 2
+unsigned int batArray[BAT_ARR_SIZE];
 
 unsigned long actTime = 0;
 unsigned long prevTime = 0;
-bool firstTime = true;
 
+// used for check motor power
+unsigned int actualSupportLevel = 0;
+unsigned int crankRPM = 0;
+unsigned int torque = 0;
+unsigned int actRiderPower = 0;
+unsigned int avrRiderPower = 0;
+#define RID_ARR_SIZE 8   // must be power of 2
+unsigned int riderPowerArr[RID_ARR_SIZE];
+unsigned int motorPower = 0;
 
+// int CAN frames to send
 CanFrame frame580(0x580, 0, 3, data580);
 CanFrame frame581(0x581, 0, 7, data581);
 CanFrame frame582(0x582, 0, 4, data582);
@@ -65,25 +79,28 @@ void setup()
 	  battery.begin(5170, 9.5);  //9.41 -> 9.4098451042
     
     CAN.setMode(MODE_NORMAL);
-    // TODO: uncoment when interupts will works
+
+    // TODO: uncoment when interupts will works. For now works only on arduino UNO.
+    /*
     // attach interrupt
     
-    // pinMode(CAN_INT, INPUT_PULLUP);
-    // attachPCINT(digitalPinToPCINT(CAN_INT), MCP2515_ISR, FALLING);
+    pinMode(CAN_INT, INPUT_PULLUP);
+    attachPCINT(digitalPinToPCINT(CAN_INT), MCP2515_ISR, FALLING);
 
-    // CAN.setSleepWakeup(1);                                   // this tells the MCP2515 to wake up on incoming messages
+    CAN.setSleepWakeup(1);                                   // this tells the MCP2515 to wake up on incoming messages
 
-    // Pull the Rs pin of the MCP2551 transceiver low to enable it:
+    Pull the Rs pin of the MCP2551 transceiver low to enable it:
 
 
-    // if(RS_TO_MCP2515) 
-    // {
-    //   CAN.mcpPinMode(MCP_RX0BF, MCP_PIN_OUT);
-    //   CAN.mcpDigitalWrite(RS_OUTPUT, LOW);
-    // } else {
-    //   pinMode(RS_OUTPUT, OUTPUT);
-    //   digitalWrite(RS_OUTPUT, LOW);
-    // }
+    if(RS_TO_MCP2515) 
+    {
+      CAN.mcpPinMode(MCP_RX0BF, MCP_PIN_OUT);
+      CAN.mcpDigitalWrite(RS_OUTPUT, LOW);
+    } else {
+      pinMode(RS_OUTPUT, OUTPUT);
+      digitalWrite(RS_OUTPUT, LOW);
+    }
+    */
 }
 
 void MCP2515_ISR()
@@ -92,33 +109,23 @@ void MCP2515_ISR()
 }
 
 void loop()
-{   
-  // if(firstTime){                       // first initiate battery array
-  //   firstTime = false;
-  //   delay(1200);
-  //   for (int i=0;i<BAT_ARR_SIZE;i++){
-  //     batArray[i] = battery.level();
-  //   delay(25);
-  //   }
-  //   batLevel = calculateBattery(batArray);
-  //   *data581 = batLevel;
-  //   *data781 = batLevel;
-  // }
-// TODO: uncoment when interupts will works
-    // if(flagRecv) 
-    // {             // check if get data
+{
+/* TODO: uncoment when interupts will works. For now works only on arduino UNO.
 
-    
-
+    if(flagRecv) 
+    {             // check if get data
+*/
+  
         flagRecv = 0;                   // clear flag
         lastBusActivity = millis();
 
         actTime = millis();
-        if (actTime - prevTime >= 250UL){
+        if (actTime - prevTime >= 250UL)                         // read battery level in every 250ms
+        {
           prevTime = actTime;
-          r_left(batArray, BAT_ARR_SIZE);
-          batArray[(BAT_ARR_SIZE-1)] = battery.level();
-          batLevel = calculateBattery(batArray);
+          r_left(batArray, BAT_ARR_SIZE);                       // shift battery measurement array
+          batArray[BAT_ARR_SIZE-1] = battery.level();         // add current measurement to last element 
+          batLevel = calculateAverage(batArray, BAT_ARR_SIZE);  // calculate average
           *data581 = batLevel;
           *data781 = batLevel;
         }
@@ -134,7 +141,8 @@ void loop()
               memcpy(lastBuf, buf, sizeof(buf));
               lastMsgTime = millis();
 
-              switch (CAN.getCanId()){
+              switch (CAN.getCanId())
+              {
                 case 0x020: //  0x40000020
                   *data59F = 0x01;
                   frame59F.sendCAN(CAN);
@@ -173,62 +181,102 @@ void loop()
                   frame781.sendCAN(CAN);
                   frame784.sendCAN(CAN);
                   break;
+                case 0x642: 
+                  actualSupportLevel = getPercentLevel(buf[0]);                   // support level is in CAN Data [0]
+                  break;
+                case 0x6C2:    // Make a lot of calculation to get motor power from CANBUS data
+                  crankRPM = round(buf[5]*25.6) + floor((buf[4]+3)*0.1);          // calculate RPM from CAN data [4] and [5]
+                  torque = buf[2] + (0xFF*buf[3]);                                // calculate torque grom CAN data [2] and [3]
+                  actRiderPower = (torque * crankRPM) / 100;                      // calculate rider power
+                  r_left(riderPowerArr, RID_ARR_SIZE);                   // shift rider power array
+                  riderPowerArr[RID_ARR_SIZE-1] = actRiderPower;         // add rider power to last element of array
+                  avrRiderPower = calculateAverage(riderPowerArr, RID_ARR_SIZE);
+                  motorPower = 
+                    (actualSupportLevel*avrRiderPower/100 <= 250 ? 
+                    actualSupportLevel*avrRiderPower/100 : 250);                   //calculate actual motor power, can not be more than 250W
+                  break;
                 default:
                   break;
               }
             // }
         }
-// TODO: uncoment when interupts will works
-    // } else if(millis() > lastBusActivity + KEEP_AWAKE_TIME) 
-    // { 
-    //   // Put MCP2515 into sleep mode
-    //   CAN.sleep();
+/* TODO: uncoment when interupts will works. For now works only on arduino UNO.
+    } else if(millis() > lastBusActivity + KEEP_AWAKE_TIME) 
+    { 
+      // Put MCP2515 into sleep mode
+      CAN.sleep();
       
-    //   // Put the transceiver into standby (by pulling Rs high):
-    //   if(RS_TO_MCP2515) 
-    //     CAN.mcpDigitalWrite(RS_OUTPUT, HIGH);
-    //   else 
-    //     digitalWrite(RS_OUTPUT, HIGH);
+      // Put the transceiver into standby (by pulling Rs high):
+      if(RS_TO_MCP2515) 
+        CAN.mcpDigitalWrite(RS_OUTPUT, HIGH);
+      else 
+        digitalWrite(RS_OUTPUT, HIGH);
 
-    //   cli(); // Disable interrupts
-    //   if(!flagRecv) // Make sure we havn't missed an interrupt between the check above and now. If an interrupt happens between now and sei()/sleep_cpu() then sleep_cpu() will immediately wake up again
-    //   {
-    //     set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-    //     sleep_enable();
-    //     sleep_bod_disable();
-    //     sei();
-    //     sleep_cpu();
-    //     // Now the Arduino sleeps until the next message arrives...
-    //     sleep_disable();
-    //   }
-    //   sei();
+      cli(); // Disable interrupts
+      if(!flagRecv) // Make sure we havn't missed an interrupt between the check above and now. If an interrupt happens between now and sei()/sleep_cpu() then sleep_cpu() will immediately wake up again
+      {
+        set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+        sleep_enable();
+        sleep_bod_disable();
+        sei();
+        sleep_cpu();
+        // Now the Arduino sleeps until the next message arrives...
+        sleep_disable();
+      }
+      sei();
 
-    //   CAN.wake(); // When the MCP2515 wakes up it will be in LISTENONLY mode, here we put it into the mode it was before sleeping
+      CAN.wake(); // When the MCP2515 wakes up it will be in LISTENONLY mode, here we put it into the mode it was before sleeping
 
-    //   // Wake up the transceiver:
-    //   if(RS_TO_MCP2515) 
-    //     CAN.mcpDigitalWrite(RS_OUTPUT, LOW);
-    //   else 
-    //     digitalWrite(RS_OUTPUT, LOW);
-    // }
+      // Wake up the transceiver:
+      if(RS_TO_MCP2515) 
+        CAN.mcpDigitalWrite(RS_OUTPUT, LOW);
+      else 
+        digitalWrite(RS_OUTPUT, LOW);
+    }
+*/
 }
 
-//rotate Left
+//shift left array
 void r_left(int *a,int n) 
 {
   memmove(a,a+1,sizeof(int)*(n-1));
 }
 
-//calculate battery level
-int calculateBattery(int *ar) 
+//calculate average from array
+int calculateAverage(int *ar, int size) 
 {
   long level = 0;
-  for (int i=0;i<BAT_ARR_SIZE;i++){
+  int iter = size;
+  int count = 0;
+  for (int i=0;i<size;i++)
+  {
     level+=ar[i];
   }
-  // level=level/BAT_ARR_SIZE;
-  level = level >> 6;
-  return level;
+  while (iter!=1)
+  {
+      iter=iter>>1;
+      count++;
+  }
+  return level >> count;
+}
+
+int getPercentLevel(char data)
+{
+  switch(data)
+  {
+    case 0x1B: return 50; break;
+    case 0x1A: return 75; break;
+    case 0x19: return 100; break;
+    case 0x18: return 125; break;
+    case 0x17: return 150; break;
+    case 0x16: return 175; break;
+    case 0x15: return 200; break;
+    case 0x14: return 250; break;
+    case 0x13: return 300; break;
+    case 0x12: return 350; break;
+    case 0x11: return 360; break;
+    default: return 0; break;
+  }
 }
 /*********************************************************************************************************
   END FILE
