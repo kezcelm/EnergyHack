@@ -33,7 +33,7 @@ unsigned long lastMsgTime = 0;
 #define BAT_MIN 32000
 #define BAT_MAX 41000
 Battery battery(BAT_MIN, BAT_MAX, A0);
-unsigned char batLevel = 0;
+unsigned char batLevel = 100;
 
 #define BAT_ARR_SIZE 64   // must be power of 2
 unsigned int batArray[BAT_ARR_SIZE];
@@ -44,8 +44,8 @@ unsigned long prevTime = 0;
 // used for check motor power
 unsigned int actualSupportLevel = 0;
 unsigned int crankRPM = 0;
-unsigned int torque = 0;
-unsigned int actRiderPower = 0;
+unsigned long torque = 0;
+unsigned long actRiderPower = 0;
 unsigned int avrRiderPower = 0;
 #define RID_ARR_SIZE 8   // must be power of 2
 unsigned int riderPowerArr[RID_ARR_SIZE];
@@ -124,16 +124,17 @@ void loop()
         {
           prevTime = actTime;
           r_left(batArray, BAT_ARR_SIZE);                       // shift battery measurement array
-          batArray[BAT_ARR_SIZE-1] = battery.level();           // add current measurement to last element 
+          // batArray[BAT_ARR_SIZE-1] = battery.level();           // add current measurement to last element 
 
-          // if (motorPower!=0) // if motor is loaded, allow for voltage drop
-          // {
-          //   batArray[BAT_ARR_SIZE-1] = (battery.level()+motorPower/10 > batLevel ? batLevel:battery.level()+motorPower/10);
-          // }
-          // else
-          // {
-          //   batArray[BAT_ARR_SIZE-1] = battery.level();
-          // }
+          if (motorPower!=0) // if motor is loaded, allow for voltage drop
+          {
+            // batArray[BAT_ARR_SIZE-1] = (battery.level()+(motorPower/10) > batLevel ? batLevel:battery.level()+(motorPower/10));
+            batArray[BAT_ARR_SIZE-1] = battery.level()+(motorPower/10);
+          }
+          else
+          {
+            batArray[BAT_ARR_SIZE-1] = battery.level();
+          }
           
           batLevel = calculateAverage(batArray, BAT_ARR_SIZE);  // calculate average
           *data581 = batLevel;
@@ -196,14 +197,14 @@ void loop()
                   break;
                 case 0x6C2:    // Make a lot of calculation to get motor power from CANBUS data
                   crankRPM = round(buf[5]*25.6) + floor((buf[4]+3)*0.1);          // calculate RPM from CAN data [4] and [5]
-                  torque = buf[2] + (0xFF*buf[3]);                                // calculate torque grom CAN data [2] and [3]
-                  actRiderPower = (torque * crankRPM) / 100;                      // calculate rider power
+                  torque = (buf[3] + (255*buf[2]));                                // calculate torque grom CAN data [2] and [3]
+                  actRiderPower = (torque * crankRPM) * 0.01;                      // calculate rider power
                   r_left(riderPowerArr, RID_ARR_SIZE);                   // shift rider power array
                   riderPowerArr[RID_ARR_SIZE-1] = actRiderPower;         // add rider power to last element of array
                   avrRiderPower = calculateAverage(riderPowerArr, RID_ARR_SIZE);
                   motorPower = 
-                    (actualSupportLevel*avrRiderPower/100 <= 250 ? 
-                    actualSupportLevel*avrRiderPower/100 : 250);                   //calculate actual motor power, can not be more than 250W
+                    (avrRiderPower*actualSupportLevel*0.01 <= 250 ? 
+                    avrRiderPower*actualSupportLevel*0.01 : 250);                   //calculate actual motor power, can not be more than 250W 
                   break;
                 default:
                   break;
@@ -255,7 +256,7 @@ void r_left(int *a,int n)
 //calculate average from array
 int calculateAverage(int *ar, int size) 
 {
-  long level = 0;
+  long long level = 0;
   int iter = size;
   int count = 0;
   for (int i=0;i<size;i++)
