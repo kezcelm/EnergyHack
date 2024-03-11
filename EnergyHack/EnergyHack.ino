@@ -38,7 +38,7 @@ unsigned char batLevel = 100;
 #define BAT_ARR_SIZE 32   // must be power of 2
 unsigned int batArray[BAT_ARR_SIZE];
 
-int currentSensorPin = A2;      // current measurament
+int currentSensorPin = A2;      // current measurement
 int currentValue = 0;     // initial value
 #define CUR_ARR_SIZE 8    // current array size, mus be power of 2
 unsigned int curArray[CUR_ARR_SIZE]; // current array
