@@ -35,8 +35,13 @@ unsigned long lastMsgTime = 0;
 Battery battery(BAT_MIN, BAT_MAX, A0);
 unsigned char batLevel = 100;
 
-#define BAT_ARR_SIZE 64   // must be power of 2
+#define BAT_ARR_SIZE 32   // must be power of 2
 unsigned int batArray[BAT_ARR_SIZE];
+
+int currentSensorPin = A2;      // current measurament
+int currentValue = 0;     // initial value
+#define CUR_ARR_SIZE 8    // current array size, mus be power of 2
+unsigned int curArray[CUR_ARR_SIZE]; // current array
 
 unsigned long actTime = 0;
 unsigned long prevTime = 0;
@@ -72,11 +77,13 @@ CanFrame frame782(0x782, 0, 4, data782);
 CanFrame frame783(0x783, 0, 5, data783);
 CanFrame frame784(0x784, 0, 3, data784);
 
+
 void setup()
 {
     Serial.begin(9600);
     CAN.begin(CAN_500KBPS, MCP_8MHz);
 	  battery.begin(5170, 9.5);  //9.41 -> 9.4098451042
+    currentValue = analogRead(currentSensorPin);
     
     CAN.setMode(MODE_NORMAL);
 
@@ -121,20 +128,28 @@ void loop()
 
         actTime = millis();
         if (actTime - prevTime >= 250UL)                         // read battery level in every 250ms
+
         {
           prevTime = actTime;
-          r_left(batArray, BAT_ARR_SIZE);                       // shift battery measurement array
-          // batArray[BAT_ARR_SIZE-1] = battery.level();           // add current measurement to last element 
 
+          r_left(curArray, CUR_ARR_SIZE);
+          curArray[CUR_ARR_SIZE-1] = (analogRead(currentSensorPin)-512)/26;   // calculate actual current value
+          currentValue = calculateAverage(curArray, CUR_ARR_SIZE);
+
+
+          r_left(batArray, BAT_ARR_SIZE);                       // shift battery measurement array
+          batArray[BAT_ARR_SIZE-1] = battery.level() + (currentValue*2.86);  // add current measurement to last element, plus battery drop on load
+
+
+          /* workoround for dropping voltange on battery on load
           if (motorPower!=0) // if motor is loaded, allow for voltage drop
           {
-            // batArray[BAT_ARR_SIZE-1] = (battery.level()+(motorPower/10) > batLevel ? batLevel:battery.level()+(motorPower/10));
             batArray[BAT_ARR_SIZE-1] = battery.level()+(motorPower/10);
           }
           else
           {
             batArray[BAT_ARR_SIZE-1] = battery.level();
-          }
+          }*/                                               
           
           batLevel = calculateAverage(batArray, BAT_ARR_SIZE);  // calculate average
           *data581 = batLevel;
