@@ -129,11 +129,11 @@ void loop()
 
           currentValue = (analogRead(currentSensorPin) - CUR_SENSOR_OFFSET)/25.6;
           r_left(batArray, BAT_ARR_SIZE);                                           // shift battery measurement array
-          batArray[BAT_ARR_SIZE-1] = battery.level() + (currentValue*2.86);         // add current measurement to last element, plus battery drop on load                                            
+          batArray[BAT_ARR_SIZE-1] = battery.level() + (currentValue * 1.5);        // add current measurement to last element, plus battery drop on load                                            
           
           batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
-          *data581 = batLevel;
-          *data781 = batLevel;
+          *data581 = batLevel + 25;
+          *data781 = batLevel + 25;
         }
 
         while (CAN_MSGAVAIL == CAN.checkReceive()) 
