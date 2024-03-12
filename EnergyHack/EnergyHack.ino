@@ -9,14 +9,14 @@
 const int SPI_CS_PIN = 10;
 
 //used for interupt
-#define CAN_INT 2                                            // Set INT to pin 2
+#define CAN_INT 2                     // Set INT to pin 2
 
-#define RS_TO_MCP2515 true                                   // Set this to false if Rs is connected to your Arduino
-#define RS_OUTPUT MCP_RX0BF                                  // RX0BF is a pin of the MCP2515. You can also define an Arduino pin here
+#define RS_TO_MCP2515 true            // Set this to false if Rs is connected to your Arduino
+#define RS_OUTPUT MCP_RX0BF           // RX0BF is a pin of the MCP2515. You can also define an Arduino pin here
 
-MCP_CAN CAN(SPI_CS_PIN);                                    // Set CS pin
+MCP_CAN CAN(SPI_CS_PIN);              // Set CS pin
                              
-#define KEEP_AWAKE_TIME 2000                                // time the controller will stay awake after the last activity on the bus (in ms)
+#define KEEP_AWAKE_TIME 2000          // time the controller will stay awake after the last activity on the bus (in ms)
 unsigned long lastBusActivity = millis();
 
 unsigned char flagRecv = 0;
@@ -35,26 +35,17 @@ unsigned long lastMsgTime = 0;
 Battery battery(BAT_MIN, BAT_MAX, A0);
 unsigned char batLevel = 100;
 
-#define BAT_ARR_SIZE 32   // must be power of 2
+#define BAT_ARR_SIZE 32               // battery level array size, must be power of 2
 unsigned int batArray[BAT_ARR_SIZE];
 
-int currentSensorPin = A2;      // current measurement
-int currentValue = 0;     // initial value
-#define CUR_ARR_SIZE 8    // current array size, mus be power of 2
-unsigned int curArray[CUR_ARR_SIZE]; // current array
+int currentSensorPin = A2;            // current measurement
+double currentValue = 0;              // initial value
+#define CUR_SENSOR_OFFSET 512
+// #define CUR_ARR_SIZE 4             // current array size, mus be power of 2
+// double curArray[CUR_ARR_SIZE];     // current array
 
 unsigned long actTime = 0;
 unsigned long prevTime = 0;
-
-// used for check motor power
-unsigned int actualSupportLevel = 0;
-unsigned int crankRPM = 0;
-unsigned long torque = 0;
-unsigned long actRiderPower = 0;
-unsigned int avrRiderPower = 0;
-#define RID_ARR_SIZE 8   // must be power of 2
-unsigned int riderPowerArr[RID_ARR_SIZE];
-unsigned int motorPower = 0;
 
 // int CAN frames to send
 CanFrame frame580(0x580, 0, 3, data580);
@@ -82,7 +73,7 @@ void setup()
 {
     Serial.begin(9600);
     CAN.begin(CAN_500KBPS, MCP_8MHz);
-	  battery.begin(5170, 9.5);  //9.41 -> 9.4098451042
+    battery.begin(5170, 9.5);  //9.41 -> 9.4098451042
     currentValue = analogRead(currentSensorPin);
     
     CAN.setMode(MODE_NORMAL);
@@ -127,31 +118,20 @@ void loop()
         lastBusActivity = millis();
 
         actTime = millis();
-        if (actTime - prevTime >= 250UL)                         // read battery level in every 250ms
+        if (actTime - prevTime >= 250UL)                                     // read battery level in every 250ms
 
         {
           prevTime = actTime;
 
-          r_left(curArray, CUR_ARR_SIZE);
-          curArray[CUR_ARR_SIZE-1] = (analogRead(currentSensorPin)-512)/26;   // calculate actual current value
-          currentValue = calculateAverage(curArray, CUR_ARR_SIZE);
+          // r_left(curArray, CUR_ARR_SIZE);
+          // curArray[CUR_ARR_SIZE-1] = (analogRead(currentSensorPin)-512)/26;      // calculate actual current value
+          // currentValue = calculateAverage(curArray, CUR_ARR_SIZE);
 
-
-          r_left(batArray, BAT_ARR_SIZE);                       // shift battery measurement array
-          batArray[BAT_ARR_SIZE-1] = battery.level() + (currentValue*2.86);  // add current measurement to last element, plus battery drop on load
-
-
-          /* workoround for dropping voltange on battery on load
-          if (motorPower!=0) // if motor is loaded, allow for voltage drop
-          {
-            batArray[BAT_ARR_SIZE-1] = battery.level()+(motorPower/10);
-          }
-          else
-          {
-            batArray[BAT_ARR_SIZE-1] = battery.level();
-          }*/                                               
+          currentValue = (analogRead(currentSensorPin) - CUR_SENSOR_OFFSET)/25.6;
+          r_left(batArray, BAT_ARR_SIZE);                                           // shift battery measurement array
+          batArray[BAT_ARR_SIZE-1] = battery.level() + (currentValue*2.86);         // add current measurement to last element, plus battery drop on load                                            
           
-          batLevel = calculateAverage(batArray, BAT_ARR_SIZE);  // calculate average
+          batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
           *data581 = batLevel;
           *data781 = batLevel;
         }
@@ -206,20 +186,6 @@ void loop()
                   frame780.sendCAN(CAN);
                   frame781.sendCAN(CAN);
                   frame784.sendCAN(CAN);
-                  break;
-                case 0x642: 
-                  actualSupportLevel = getPercentLevel(buf[0]);                   // support level is in CAN Data [0]
-                  break;
-                case 0x6C2:    // Make a lot of calculation to get motor power from CANBUS data
-                  crankRPM = round(buf[5]*25.6) + floor((buf[4]+3)*0.1);          // calculate RPM from CAN data [4] and [5]
-                  torque = (buf[3] + (255*buf[2]));                                // calculate torque grom CAN data [2] and [3]
-                  actRiderPower = (torque * crankRPM) * 0.01;                      // calculate rider power
-                  r_left(riderPowerArr, RID_ARR_SIZE);                   // shift rider power array
-                  riderPowerArr[RID_ARR_SIZE-1] = actRiderPower;         // add rider power to last element of array
-                  avrRiderPower = calculateAverage(riderPowerArr, RID_ARR_SIZE);
-                  motorPower = 
-                    (avrRiderPower*actualSupportLevel*0.01 <= 250 ? 
-                    avrRiderPower*actualSupportLevel*0.01 : 250);                   //calculate actual motor power, can not be more than 250W 
                   break;
                 default:
                   break;
@@ -284,25 +250,6 @@ int calculateAverage(int *ar, int size)
       count++;
   }
   return level >> count;
-}
-
-int getPercentLevel(char data)
-{
-  switch(data)
-  {
-    case 0x1B: return 50; break;
-    case 0x1A: return 75; break;
-    case 0x19: return 100; break;
-    case 0x18: return 125; break;
-    case 0x17: return 150; break;
-    case 0x16: return 175; break;
-    case 0x15: return 200; break;
-    case 0x14: return 250; break;
-    case 0x13: return 300; break;
-    case 0x12: return 350; break;
-    case 0x11: return 360; break;
-    default: return 0; break;
-  }
 }
 /*********************************************************************************************************
   END FILE
