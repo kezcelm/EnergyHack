@@ -30,19 +30,17 @@ unsigned long lastMsgTime = 0;
 #define DUPLICATE_TIMEOUT 20
 
 // used for check battery level
-#define BAT_MIN 32000
+#define BAT_MIN 32500                 // just in case, normaly should be 32000 (32V)
 #define BAT_MAX 41000
 Battery battery(BAT_MIN, BAT_MAX, A0);
 unsigned char batLevel = 100;
 
-#define BAT_ARR_SIZE 32               // battery level array size, must be power of 2
+#define BAT_ARR_SIZE 512              // battery level array size, must be power of 2
 unsigned int batArray[BAT_ARR_SIZE];
 
 int currentSensorPin = A2;            // current measurement
 double currentValue = 0;              // initial value
 #define CUR_SENSOR_OFFSET 512
-// #define CUR_ARR_SIZE 4             // current array size, mus be power of 2
-// double curArray[CUR_ARR_SIZE];     // current array
 
 unsigned long actTime = 0;
 unsigned long prevTime = 0;
@@ -68,15 +66,20 @@ CanFrame frame782(0x782, 0, 4, data782);
 CanFrame frame783(0x783, 0, 5, data783);
 CanFrame frame784(0x784, 0, 3, data784);
 
+bool firstTime = true;
 
 void setup()
 {
     Serial.begin(9600);
     CAN.begin(CAN_500KBPS, MCP_8MHz);
     battery.begin(5170, 9.5);  //9.41 -> 9.4098451042
-    currentValue = analogRead(currentSensorPin);
-    
+    currentValue = (analogRead(currentSensorPin) - CUR_SENSOR_OFFSET)/25.6;
     CAN.setMode(MODE_NORMAL);
+    delay(3000);
+    for (int i=0;i<BAT_ARR_SIZE;i++)
+    {
+      batArray[i] = battery.level();
+    }
 
     // TODO: uncoment when interupts will works. For now works only on arduino UNO.
     /*
@@ -113,23 +116,17 @@ void loop()
     if(flagRecv) 
     {             // check if get data
 */
-  
         flagRecv = 0;                   // clear flag
         lastBusActivity = millis();
-
         actTime = millis();
-        if (actTime - prevTime >= 250UL)                                     // read battery level in every 250ms
+        if (actTime - prevTime >= 250UL)                                            // read battery level in every 250ms
 
         {
           prevTime = actTime;
 
-          // r_left(curArray, CUR_ARR_SIZE);
-          // curArray[CUR_ARR_SIZE-1] = (analogRead(currentSensorPin)-512)/26;      // calculate actual current value
-          // currentValue = calculateAverage(curArray, CUR_ARR_SIZE);
-
           currentValue = (analogRead(currentSensorPin) - CUR_SENSOR_OFFSET)/25.6;
           r_left(batArray, BAT_ARR_SIZE);                                           // shift battery measurement array
-          batArray[BAT_ARR_SIZE-1] = battery.level() + (currentValue * 1.5);        // add current measurement to last element, plus battery drop on load                                            
+          batArray[BAT_ARR_SIZE-1] = battery.level() + (currentValue * 2.86);       // add current measurement to last element, plus battery drop on load                                            
           
           batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
           *data581 = batLevel + 25;
