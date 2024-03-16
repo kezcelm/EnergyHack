@@ -119,7 +119,7 @@ void loop()
         flagRecv = 0;                   // clear flag
         lastBusActivity = millis();
         actTime = millis();
-        if (actTime - prevTime >= 250UL)                                            // read battery level in every 250ms
+        if (actTime - prevTime >= 500UL)                                            // read battery level in every 250ms
 
         {
           prevTime = actTime;
