@@ -31,16 +31,20 @@ unsigned long lastMsgTime = 0;
 
 // used for check battery level
 #define BAT_MIN 32500                 // just in case, normaly should be 32000 (32V)
-#define BAT_MAX 41000
+#define BAT_MAX 40500
 Battery battery(BAT_MIN, BAT_MAX, A0);
 unsigned char batLevel = 100;
 
-#define BAT_ARR_SIZE 512              // battery level array size, must be power of 2
+#define BAT_ARR_SIZE 128              // battery level array size, must be power of 2
 unsigned int batArray[BAT_ARR_SIZE];
 
 int currentSensorPin = A2;            // current measurement
 double currentValue = 0;              // initial value
 #define CUR_SENSOR_OFFSET 512
+double dropGap = 0;
+double ax2 = -8.4413;
+double bx = 528.9588;
+double c = 197.3215;
 
 unsigned long actTime = 0;
 unsigned long prevTime = 0;
@@ -119,14 +123,17 @@ void loop()
         flagRecv = 0;                   // clear flag
         lastBusActivity = millis();
         actTime = millis();
-        if (actTime - prevTime >= 500UL)                                            // read battery level in every 250ms
+        if (actTime - prevTime >= 1000UL)                                            // read battery level in every 1s
 
         {
           prevTime = actTime;
 
           currentValue = (analogRead(currentSensorPin) - CUR_SENSOR_OFFSET)/25.6;
+          dropGap = ax2*currentValue*currentValue + 
+                    bx*currentValue +
+                    c;
           r_left(batArray, BAT_ARR_SIZE);                                           // shift battery measurement array
-          batArray[BAT_ARR_SIZE-1] = battery.level() + (currentValue * 2.86);       // add current measurement to last element, plus battery drop on load                                            
+          batArray[BAT_ARR_SIZE-1] = battery.level(battery.voltage() + dropGap);    // add current measurement to last element, plus battery drop on load                                            
           
           batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
           *data581 = batLevel + 25;
