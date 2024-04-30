@@ -38,13 +38,27 @@ unsigned char batLevel = 100;
 #define BAT_ARR_SIZE 128              // battery level array size, must be power of 2
 unsigned int batArray[BAT_ARR_SIZE];
 
-int currentSensorPin = A2;            // current measurement
-double currentValue = 0;              // initial value
+int curSensorPin = A2;               // current measurement
+double curValue = 0;                 // initial value
 #define CUR_SENSOR_OFFSET 512
 double dropGap = 0;
-double ax2 = -8.4413;
-double bx = 528.9588;
-double c = 197.3215;
+#define CUR_ARR_SIZE 8               // current array size, must be power of 2
+int curArray[CUR_ARR_SIZE];
+// double ax2 = -8.4413;
+// double bx = 528.9588;
+// double c = 197.3215;
+
+// double ax2 = -4.22;  za mało
+// double bx = 264.48;
+// double c = 98.66;
+
+// double ax2 = -6.33;   za dużo 
+// double bx = 796.72;
+// double c = 98.66;
+
+double ax2 = -4.853;
+double bx = 304.152;
+double c = 113.459;
 
 unsigned long actTime = 0;
 unsigned long prevTime = 0;
@@ -77,7 +91,6 @@ void setup()
     Serial.begin(9600);
     CAN.begin(CAN_500KBPS, MCP_8MHz);
     battery.begin(5170, 9.5);  //9.41 -> 9.4098451042
-    currentValue = (analogRead(currentSensorPin) - CUR_SENSOR_OFFSET)/25.6;
     CAN.setMode(MODE_NORMAL);
     delay(3000);
     for (int i=0;i<BAT_ARR_SIZE;i++)
@@ -128,16 +141,22 @@ void loop()
         {
           prevTime = actTime;
 
-          currentValue = (analogRead(currentSensorPin) - CUR_SENSOR_OFFSET)/25.6;
-          dropGap = ax2*currentValue*currentValue + 
-                    bx*currentValue +
-                    c;
+          //curValue = (analogRead(curSensorPin) - CUR_SENSOR_OFFSET)/25.6;
+          r_left(curArray, CUR_ARR_SIZE);
+          curArray[CUR_ARR_SIZE-1] = (analogRead(curSensorPin) - CUR_SENSOR_OFFSET)/25.6;
+          curValue = calculateAverage(curArray, CUR_ARR_SIZE); 
+          dropGap = ax2*curValue*curValue + 
+                    bx*curValue;// +
+                    //c;
           r_left(batArray, BAT_ARR_SIZE);                                           // shift battery measurement array
           batArray[BAT_ARR_SIZE-1] = battery.level(battery.voltage() + dropGap);    // add current measurement to last element, plus battery drop on load                                            
           
           batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
           *data581 = batLevel + 25;
           *data781 = batLevel + 25;
+          // *data581 = batArray[BAT_ARR_SIZE-1];
+          // *data781 = batArray[BAT_ARR_SIZE-1];
+          
         }
 
         while (CAN_MSGAVAIL == CAN.checkReceive()) 
