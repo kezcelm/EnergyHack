@@ -52,6 +52,9 @@ double dropGap = 0;
 double ampereArray[AMPERE_ARR_SIZE];
 int chargingIter = 0;
 
+#define TOTAL_COULUMB 61200
+double coulumb = 0;
+
 //--------------------------------------------------------------------------
 // double ax2 = -4.22;  // initaial values
 // double bx = 264.48;
@@ -172,6 +175,8 @@ void loop()
           batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
           *data581 = batLevel;
           *data781 = batLevel;
+
+          coulumb+=ampereArray[AMPERE_ARR_SIZE-1];
 
           
 
