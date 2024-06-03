@@ -12,6 +12,7 @@ CanFrame::CanFrame(unsigned long canId, byte canExt, byte canDlc, byte *data) {
 
 void CanFrame::sendCAN(MCP_CAN CAN){
   CAN.sendMsgBuf(this->can_id,  this->can_ext,  this->can_dlc,  this->data);
+  delay(1);
 }
 
 

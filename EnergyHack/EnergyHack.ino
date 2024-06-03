@@ -5,6 +5,12 @@
 #include <PinChangeInterrupt.h>
 #include <Battery.h>
 
+const int LED1 = 3;
+const int LED2 = 4;
+const int LED3 = 5;
+const int LED4 = 6;
+const int LED5 = 7;
+const int Switch = 8;
 
 const int SPI_CS_PIN = 10;
 
@@ -30,35 +36,34 @@ unsigned long lastMsgTime = 0;
 #define DUPLICATE_TIMEOUT 20
 
 // used for check battery level
-#define BAT_MIN 32500                 // just in case, normaly should be 32000 (32V)
+#define BAT_MIN 32000
 #define BAT_MAX 40500
-Battery battery(BAT_MIN, BAT_MAX, A0);
+Battery battery(BAT_MIN, BAT_MAX, A2);
 unsigned char batLevel = 100;
 
-#define BAT_ARR_SIZE 128              // battery level array size, must be power of 2
+#define BAT_ARR_SIZE 512              // battery level array size, must be power of 2
 unsigned int batArray[BAT_ARR_SIZE];
 
-int curSensorPin = A2;               // current measurement
-double curValue = 0;                 // initial value
-#define CUR_SENSOR_OFFSET 512
+int ampereSensorPin = A0;               // current measurement
+double ampereValue = 0;                 // initial value
+#define AMPERE_SENSOR_OFFSET 512
 double dropGap = 0;
-#define CUR_ARR_SIZE 8               // current array size, must be power of 2
-int curArray[CUR_ARR_SIZE];
-// double ax2 = -8.4413;
-// double bx = 528.9588;
-// double c = 197.3215;
+#define AMPERE_ARR_SIZE 16               // current array size, must be power of 2
+double ampereArray[AMPERE_ARR_SIZE];
+int chargingIter = 0;
 
-// double ax2 = -4.22;  za mało
+//--------------------------------------------------------------------------
+// double ax2 = -4.22;  // initaial values
 // double bx = 264.48;
-// double c = 98.66;
+double c = 98.66;
 
-// double ax2 = -6.33;   za dużo 
-// double bx = 796.72;
-// double c = 98.66;
+// double ax2 = -4.69475;    // 1.1125 minimalnie za duzo
+// double bx = 294.234;
+// double c = 109.75925;
 
-double ax2 = -4.853;
-double bx = 304.152;
-double c = 113.459;
+double ax2 = -4.69264;    // 1.112
+double bx = 294.10176;
+//--------------------------------------------------------------------------
 
 unsigned long actTime = 0;
 unsigned long prevTime = 0;
@@ -90,13 +95,26 @@ void setup()
 {
     Serial.begin(9600);
     CAN.begin(CAN_500KBPS, MCP_8MHz);
-    battery.begin(5170, 9.5);  //9.41 -> 9.4098451042
+    battery.begin(5160, 8.6559);  //9.41 -> 9.4098451042
     CAN.setMode(MODE_NORMAL);
     delay(3000);
     for (int i=0;i<BAT_ARR_SIZE;i++)
     {
       batArray[i] = battery.level();
     }
+
+    //LEDs
+    pinMode(Switch, INPUT_PULLUP);
+    pinMode(LED1, OUTPUT);
+    pinMode(LED2, OUTPUT);
+    pinMode(LED3, OUTPUT);
+    pinMode(LED4, OUTPUT);
+    pinMode(LED5, OUTPUT);
+    digitalWrite(LED1, HIGH);
+    digitalWrite(LED2, HIGH);
+    digitalWrite(LED3, HIGH);
+    digitalWrite(LED4, HIGH);
+    digitalWrite(LED5, HIGH);
 
     // TODO: uncoment when interupts will works. For now works only on arduino UNO.
     /*
@@ -133,6 +151,7 @@ void loop()
     if(flagRecv) 
     {             // check if get data
 */
+
         flagRecv = 0;                   // clear flag
         lastBusActivity = millis();
         actTime = millis();
@@ -140,23 +159,42 @@ void loop()
 
         {
           prevTime = actTime;
-
-          //curValue = (analogRead(curSensorPin) - CUR_SENSOR_OFFSET)/25.6;
-          r_left(curArray, CUR_ARR_SIZE);
-          curArray[CUR_ARR_SIZE-1] = (analogRead(curSensorPin) - CUR_SENSOR_OFFSET)/25.6;
-          curValue = calculateAverage(curArray, CUR_ARR_SIZE); 
-          dropGap = ax2*curValue*curValue + 
-                    bx*curValue;// +
+          r_left_double(ampereArray, AMPERE_ARR_SIZE);
+          ampereArray[AMPERE_ARR_SIZE-1] = (analogRead(ampereSensorPin) - AMPERE_SENSOR_OFFSET)/-25.6;    //  -25.6 becouse of wrong wire connection
+          ampereValue = calculateAverage_double(ampereArray, AMPERE_ARR_SIZE);
+          dropGap = ax2*ampereValue*ampereValue + 
+                    bx*ampereValue;// +
                     //c;
+
           r_left(batArray, BAT_ARR_SIZE);                                           // shift battery measurement array
           batArray[BAT_ARR_SIZE-1] = battery.level(battery.voltage() + dropGap);    // add current measurement to last element, plus battery drop on load                                            
           
           batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
-          *data581 = batLevel + 25;
-          *data781 = batLevel + 25;
-          // *data581 = batArray[BAT_ARR_SIZE-1];
-          // *data781 = batArray[BAT_ARR_SIZE-1];
+          *data581 = batLevel;
+          *data781 = batLevel;
+
           
+
+          if(ampereValue <= -2.00)  //   charging
+          {
+            switch (chargingIter)
+            {
+              case 1: digitalWrite(LED1, LOW); break;
+              case 2: digitalWrite(LED2, LOW); break;
+              case 3: digitalWrite(LED3, LOW); break;
+              case 4: digitalWrite(LED4, LOW); break;
+              case 5: digitalWrite(LED5, LOW); break;
+              default: 
+                chargingIter=0; 
+                digitalWrite(LED1, HIGH);
+                digitalWrite(LED2, HIGH);
+                digitalWrite(LED3, HIGH);
+                digitalWrite(LED4, HIGH);
+                digitalWrite(LED5, HIGH);
+                break;
+            }
+            chargingIter++;
+          }
         }
 
         while (CAN_MSGAVAIL == CAN.checkReceive()) 
@@ -208,7 +246,7 @@ void loop()
                 case 0x641:
                   frame780.sendCAN(CAN);
                   frame781.sendCAN(CAN);
-                  frame784.sendCAN(CAN);
+                  frame784.sendCAN(CAN); 
                   break;
                 default:
                   break;
@@ -273,6 +311,49 @@ int calculateAverage(int *ar, int size)
       count++;
   }
   return level >> count;
+}
+
+//shift left array
+void r_left_double(double *a,int n) 
+{
+  memmove(a,a+1,sizeof(double)*(n-1));
+}
+
+//calculate average from array
+double calculateAverage_double(double *ar, int size) 
+{
+  double value = 0;
+  int iter = size;
+  int count = 0;
+  for (int i=0;i<size;i++)
+  {
+    value+=ar[i];
+  }
+  return value/size;
+}
+
+void checkBattery(int batLevel)
+{
+  if (batLevel >= 11) digitalWrite(LED1, LOW);
+  if (batLevel >= 21) digitalWrite(LED2, LOW);
+  if (batLevel >= 41) digitalWrite(LED3, LOW);
+  if (batLevel >= 61) digitalWrite(LED4, LOW);
+  if (batLevel >= 80) digitalWrite(LED5, LOW);
+  if (batLevel <= 10) 
+  {
+    digitalWrite(LED1, LOW);delay(500);digitalWrite(LED1, HIGH);delay(500);
+    digitalWrite(LED1, LOW);delay(500);digitalWrite(LED1, HIGH);delay(500);
+    digitalWrite(LED1, LOW);delay(500);digitalWrite(LED1, HIGH);delay(500);
+  }
+  else
+  {
+    delay(3000);
+  }
+  digitalWrite(LED1, HIGH);
+  digitalWrite(LED2, HIGH);
+  digitalWrite(LED3, HIGH);
+  digitalWrite(LED4, HIGH);
+  digitalWrite(LED5, HIGH);
 }
 /*********************************************************************************************************
   END FILE
