@@ -5,6 +5,29 @@
 #include <PinChangeInterrupt.h>
 #include <Battery.h>
 
+//--------------------------------------------------------------------------
+//--------------------------------------------------------------------------
+// Adjusted parameters
+// #define VCC 5160                         // Vcc, measure on arduino
+// #define VOLTAGE_DIVIDER 8.6559           // Voltage divider ratio (R1 + R2) / R2
+// #define AMPERE_SENSOR_OFFSET 512         // 512 by defoult
+// #define AMP_DIRECRION -1;                // depends on battery in+/out+ connection; 1/-1
+
+// arduino nano 
+#define VCC 5080                         // Vcc, measure on arduino
+#define VOLTAGE_DIVIDER 11.03681614675027 // Voltage divider ratio (R1 + R2) / R2
+#define AMPERE_SENSOR_OFFSET 539         // 512 by defoult
+#define AMP_DIRECRION 1;                // depends on battery in+/out+ connection; 1/-1
+
+
+
+
+//#define P 1.1125                       //  1.1125 minimalnie za duzo
+#define P 1.112                          //  to adjust voltage drop gap on load battery
+#define INITIAL_DELAY 3000               // time for charging capasitors
+
+//--------------------------------------------------------------------------
+// Initial data
 const int LED1 = 3;
 const int LED2 = 4;
 const int LED3 = 5;
@@ -14,7 +37,8 @@ const int Switch = 8;
 
 const int SPI_CS_PIN = 10;
 
-//used for interupt
+//--------------------------------------------------------------------------
+// Data for interupt
 #define CAN_INT 2                     // Set INT to pin 2
 
 #define RS_TO_MCP2515 true            // Set this to false if Rs is connected to your Arduino
@@ -29,49 +53,58 @@ unsigned char flagRecv = 0;
 unsigned char len = 0;
 unsigned char buf[8];
 
-// used for duplicate message check below
+//--------------------------------------------------------------------------
+// Data for duplicate message check below
 int lastLen = -1;
 unsigned char lastBuf[8];                                    
 unsigned long lastMsgTime = 0;
 #define DUPLICATE_TIMEOUT 20
 
-// used for check battery level
+//--------------------------------------------------------------------------
+// Data for check battery level
 #define BAT_MIN 32000
 #define BAT_MAX 40500
-Battery battery(BAT_MIN, BAT_MAX, A2);
-unsigned char batLevel = 100;
+#define BAT_ARR_SIZE 512                 // battery level array size, must be power of 2
 
-#define BAT_ARR_SIZE 512              // battery level array size, must be power of 2
+Battery battery(BAT_MIN, BAT_MAX, A2);
+unsigned char batLevel = 100;            // actual percentage battery level
 unsigned int batArray[BAT_ARR_SIZE];
 
-int ampereSensorPin = A0;               // current measurement
-double ampereValue = 0;                 // initial value
-#define AMPERE_SENSOR_OFFSET 512
+//--------------------------------------------------------------------------
+// Data for current mearsurement
+#define AMPERE_ARR_SIZE 16              // current array size, must be power of 2
+
+int chargingIter = 0;                   // for LED blinking while charging
+int ampereSensorPin = A0;
+
+double avgAmpereValue = 0;                 // initial value
 double dropGap = 0;
-#define AMPERE_ARR_SIZE 16               // current array size, must be power of 2
+
 double ampereArray[AMPERE_ARR_SIZE];
-int chargingIter = 0;
 
-#define TOTAL_COULUMB 61200
+
+//--------------------------------------------------------------------------
+// Data for coulomb counter
 double coulumb = 0;
+unsigned int coulumb_integer = 0;
 
 //--------------------------------------------------------------------------
-// double ax2 = -4.22;  // initaial values
-// double bx = 264.48;
-double c = 98.66;
+// Data for drop voltage equation
+#define AX2 -4.22     // base values for ax2 + bx + c equation
+#define BX 264.48
+#define C 98.66
 
-// double ax2 = -4.69475;    // 1.1125 minimalnie za duzo
-// double bx = 294.234;
-// double c = 109.75925;
+double ax2 = AX2 * P;
+double bx = BX * P;
+double c = C * P;
 
-double ax2 = -4.69264;    // 1.112
-double bx = 294.10176;
 //--------------------------------------------------------------------------
-
+// Data for time checking
 unsigned long actTime = 0;
 unsigned long prevTime = 0;
 
-// int CAN frames to send
+//--------------------------------------------------------------------------
+// Intiaize CAN frames to send
 CanFrame frame580(0x580, 0, 3, data580);
 CanFrame frame581(0x581, 0, 7, data581);
 CanFrame frame582(0x582, 0, 4, data582);
@@ -92,16 +125,17 @@ CanFrame frame782(0x782, 0, 4, data782);
 CanFrame frame783(0x783, 0, 5, data783);
 CanFrame frame784(0x784, 0, 3, data784);
 
-bool firstTime = true;
+//--------------------------------------------------------------------------
+//--------------------------------------------------------------------------
 
 void setup()
 {
     Serial.begin(9600);
     CAN.begin(CAN_500KBPS, MCP_8MHz);
-    battery.begin(5160, 8.6559);  //9.41 -> 9.4098451042
+    battery.begin(VCC, VOLTAGE_DIVIDER);
     CAN.setMode(MODE_NORMAL);
-    delay(3000);
-    for (int i=0;i<BAT_ARR_SIZE;i++)
+    delay(INITIAL_DELAY);                       // wait for charge capacitor
+    for (int i=0;i<BAT_ARR_SIZE;i++)            // initaial values of battery level
     {
       batArray[i] = battery.level();
     }
@@ -118,6 +152,8 @@ void setup()
     digitalWrite(LED3, HIGH);
     digitalWrite(LED4, HIGH);
     digitalWrite(LED5, HIGH);
+    batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
+    checkBattery(batLevel);
 
     // TODO: uncoment when interupts will works. For now works only on arduino UNO.
     /*
@@ -163,42 +199,40 @@ void loop()
         {
           prevTime = actTime;
           r_left_double(ampereArray, AMPERE_ARR_SIZE);
-          ampereArray[AMPERE_ARR_SIZE-1] = (analogRead(ampereSensorPin) - AMPERE_SENSOR_OFFSET)/-25.6;    //  -25.6 becouse of wrong wire connection
-          ampereValue = calculateAverage_double(ampereArray, AMPERE_ARR_SIZE);
-          dropGap = ax2*ampereValue*ampereValue + 
-                    bx*ampereValue;// +
+          ampereArray[AMPERE_ARR_SIZE-1] = ((analogRead(ampereSensorPin) - AMPERE_SENSOR_OFFSET)/25.6)*AMP_DIRECRION;
+          avgAmpereValue = calculateAverage_double(ampereArray, AMPERE_ARR_SIZE);
+          dropGap = ax2*avgAmpereValue*avgAmpereValue + 
+                    bx*avgAmpereValue;// +
                     //c;
 
           r_left(batArray, BAT_ARR_SIZE);                                           // shift battery measurement array
           batArray[BAT_ARR_SIZE-1] = battery.level(battery.voltage() + dropGap);    // add current measurement to last element, plus battery drop on load                                            
           
           batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
+          // store battery level in CAN frames data
           *data581 = batLevel;
           *data781 = batLevel;
 
+          // Coulomb counter
           coulumb+=ampereArray[AMPERE_ARR_SIZE-1];
+          coulumb_integer = round(coulumb);
 
-          
+          // TMP just to check battery capacity
+          // store Coulomb counter value in CAN 591 frame data
+          *(data591+0) = 0x00;
+          *(data591+1) = 0x00;
+          *(data591+2) = 0x00;
+          *(data591+3) = lowByte(coulumb_integer);
+          *(data591+4) = highByte(coulumb_integer);
 
-          if(ampereValue <= -2.00)  //   charging
+          Serial.println(battery.voltage());
+          if(avgAmpereValue <= -2.00)  //   charging
           {
-            switch (chargingIter)
-            {
-              case 1: digitalWrite(LED1, LOW); break;
-              case 2: digitalWrite(LED2, LOW); break;
-              case 3: digitalWrite(LED3, LOW); break;
-              case 4: digitalWrite(LED4, LOW); break;
-              case 5: digitalWrite(LED5, LOW); break;
-              default: 
-                chargingIter=0; 
-                digitalWrite(LED1, HIGH);
-                digitalWrite(LED2, HIGH);
-                digitalWrite(LED3, HIGH);
-                digitalWrite(LED4, HIGH);
-                digitalWrite(LED5, HIGH);
-                break;
-            }
-            chargingIter++;
+            charging(chargingIter);
+            if (chargingIter<5)
+              chargingIter++;
+            else 
+              chargingIter=0;
           }
         }
 
@@ -294,13 +328,13 @@ void loop()
 */
 }
 
-//shift left array
+//shift left int array
 void r_left(int *a,int n) 
 {
   memmove(a,a+1,sizeof(int)*(n-1));
 }
 
-//calculate average from array
+//calculate average from int array
 int calculateAverage(int *ar, int size) 
 {
   long long level = 0;
@@ -318,13 +352,13 @@ int calculateAverage(int *ar, int size)
   return level >> count;
 }
 
-//shift left array
+//shift left double array
 void r_left_double(double *a,int n) 
 {
   memmove(a,a+1,sizeof(double)*(n-1));
 }
 
-//calculate average from array
+//calculate average from double array
 double calculateAverage_double(double *ar, int size) 
 {
   double value = 0;
@@ -350,15 +384,31 @@ void checkBattery(int batLevel)
     digitalWrite(LED1, LOW);delay(500);digitalWrite(LED1, HIGH);delay(500);
     digitalWrite(LED1, LOW);delay(500);digitalWrite(LED1, HIGH);delay(500);
   }
-  else
-  {
-    delay(3000);
-  }
+  delay(1000);
   digitalWrite(LED1, HIGH);
   digitalWrite(LED2, HIGH);
   digitalWrite(LED3, HIGH);
   digitalWrite(LED4, HIGH);
   digitalWrite(LED5, HIGH);
+}
+
+void charging(int chargingIter)
+{
+  switch (chargingIter)
+  {
+    case 1: digitalWrite(LED1, LOW); break;
+    case 2: digitalWrite(LED2, LOW); break;
+    case 3: digitalWrite(LED3, LOW); break;
+    case 4: digitalWrite(LED4, LOW); break;
+    case 5: digitalWrite(LED5, LOW); break;
+    default: 
+      digitalWrite(LED1, HIGH);
+      digitalWrite(LED2, HIGH);
+      digitalWrite(LED3, HIGH);
+      digitalWrite(LED4, HIGH);
+      digitalWrite(LED5, HIGH);
+      break;
+  }
 }
 /*********************************************************************************************************
   END FILE
