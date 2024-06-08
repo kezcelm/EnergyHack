@@ -8,23 +8,25 @@
 //--------------------------------------------------------------------------
 //--------------------------------------------------------------------------
 // Adjusted parameters
-// #define VCC 5160                         // Vcc, measure on arduino
-// #define VOLTAGE_DIVIDER 8.6559           // Voltage divider ratio (R1 + R2) / R2
-// #define AMPERE_SENSOR_OFFSET 512         // 512 by defoult
-// #define AMP_DIRECRION -1;                // depends on battery in+/out+ connection; 1/-1
+#define VCC 5160                         // Vcc, measure on arduino
+#define VOLTAGE_DIVIDER 11.86978340310878           // Voltage divider ratio (R1 + R2) / R2 11,03681614675027
+#define AMPERE_SENSOR_OFFSET 512         // 512 by defoult
+#define AMP_DIRECRION -1;                // depends on battery in+/out+ connection; 1/-1
+#define COULOMB_CAPACITY 52000
 
 // arduino nano 
-#define VCC 5080                         // Vcc, measure on arduino
-#define VOLTAGE_DIVIDER 11.03681614675027 // Voltage divider ratio (R1 + R2) / R2
-#define AMPERE_SENSOR_OFFSET 539         // 512 by defoult
-#define AMP_DIRECRION 1;                // depends on battery in+/out+ connection; 1/-1
+// #define VCC 5080                         // Vcc, measure on arduino
+// #define VOLTAGE_DIVIDER 11.03681614675027 // Voltage divider ratio (R1 + R2) / R2
+// #define AMPERE_SENSOR_OFFSET 539         // 512 by defoult
+// #define AMP_DIRECRION 1;                // depends on battery in+/out+ connection; 1/-1
 
 
 
 
 //#define P 1.1125                       //  1.1125 minimalnie za duzo
-#define P 1.112                          //  to adjust voltage drop gap on load battery
-#define INITIAL_DELAY 3000               // time for charging capasitors
+#define P 1.112                          //  1.112 minimalnie za duzo
+#define P 1.1115                         //  to adjust voltage drop gap on load battery
+#define INITIAL_DELAY 500                // time for charging capasitors
 
 //--------------------------------------------------------------------------
 // Initial data
@@ -63,11 +65,11 @@ unsigned long lastMsgTime = 0;
 //--------------------------------------------------------------------------
 // Data for check battery level
 #define BAT_MIN 32000
-#define BAT_MAX 40500
-#define BAT_ARR_SIZE 512                 // battery level array size, must be power of 2
+#define BAT_MAX 41207 
+#define BAT_ARR_SIZE 128                 // battery level array size, must be power of 2
 
 Battery battery(BAT_MIN, BAT_MAX, A2);
-unsigned char batLevel = 100;            // actual percentage battery level
+unsigned char batLevel = 0;            // actual percentage battery level
 unsigned int batArray[BAT_ARR_SIZE];
 
 //--------------------------------------------------------------------------
@@ -86,7 +88,8 @@ double ampereArray[AMPERE_ARR_SIZE];
 //--------------------------------------------------------------------------
 // Data for coulomb counter
 double coulumb = 0;
-unsigned int coulumb_integer = 0;
+unsigned int coulumbRound = 0;
+unsigned char  coulumbPercentage = 0;
 
 //--------------------------------------------------------------------------
 // Data for drop voltage equation
@@ -152,8 +155,10 @@ void setup()
     digitalWrite(LED3, HIGH);
     digitalWrite(LED4, HIGH);
     digitalWrite(LED5, HIGH);
+
     batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
-    checkBattery(batLevel);
+    // checkBattery(batLevel);
+    coulumb = (100-batLevel) * COULOMB_CAPACITY*0.01;
 
     // TODO: uncoment when interupts will works. For now works only on arduino UNO.
     /*
@@ -210,22 +215,27 @@ void loop()
           
           batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
           // store battery level in CAN frames data
-          *data581 = batLevel;
-          *data781 = batLevel;
 
           // Coulomb counter
           coulumb+=ampereArray[AMPERE_ARR_SIZE-1];
-          coulumb_integer = round(coulumb);
+          coulumbRound = round(coulumb);
+
+          // coulumbPercentage = 100-(coulumbRound/COULOMB_CAPACITY*100);
+          coulumbPercentage = 100-(coulumbRound*0.001923076923076923);
+          
+          *data581 = batLevel;
+          *data781 = batLevel;
+          // *data581 = coulumbPercentage;
+          // *data781 = coulumbPercentage;
 
           // TMP just to check battery capacity
           // store Coulomb counter value in CAN 591 frame data
-          *(data591+0) = 0x00;
+          *(data591+0) = coulumbPercentage;
           *(data591+1) = 0x00;
           *(data591+2) = 0x00;
-          *(data591+3) = lowByte(coulumb_integer);
-          *(data591+4) = highByte(coulumb_integer);
+          *(data591+3) = lowByte(coulumbRound);
+          *(data591+4) = highByte(coulumbRound);
 
-          Serial.println(battery.voltage());
           if(avgAmpereValue <= -2.00)  //   charging
           {
             charging(chargingIter);
