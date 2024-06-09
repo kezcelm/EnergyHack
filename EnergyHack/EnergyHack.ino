@@ -12,7 +12,7 @@
 #define VOLTAGE_DIVIDER 11.86978340310878           // Voltage divider ratio (R1 + R2) / R2 11,03681614675027
 #define AMPERE_SENSOR_OFFSET 512         // 512 by defoult
 #define AMP_DIRECRION -1;                // depends on battery in+/out+ connection; 1/-1
-#define COULOMB_CAPACITY 52000
+#define COULOMB_CAPACITY 53560
 
 // arduino nano 
 // #define VCC 5080                         // Vcc, measure on arduino
@@ -156,7 +156,7 @@ void setup()
     digitalWrite(LED4, HIGH);
     digitalWrite(LED5, HIGH);
 
-    batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
+    batLevel = calculateAverage(batArray, BAT_ARR_SIZE);     // calculate average
     // checkBattery(batLevel);
     coulumb = (100-batLevel) * COULOMB_CAPACITY*0.01;
 
@@ -199,10 +199,12 @@ void loop()
         flagRecv = 0;                   // clear flag
         lastBusActivity = millis();
         actTime = millis();
-        if (actTime - prevTime >= 1000UL)                                            // read battery level in every 1s
+        if (actTime - prevTime >= 1000UL)    // read battery level in every 1s
 
         {
           prevTime = actTime;
+
+          // Current measurement and calculate voltage drop
           r_left_double(ampereArray, AMPERE_ARR_SIZE);
           ampereArray[AMPERE_ARR_SIZE-1] = ((analogRead(ampereSensorPin) - AMPERE_SENSOR_OFFSET)/25.6)*AMP_DIRECRION;
           avgAmpereValue = calculateAverage_double(ampereArray, AMPERE_ARR_SIZE);
@@ -210,19 +212,17 @@ void loop()
                     bx*avgAmpereValue;// +
                     //c;
 
+          // Voltage measurement and calculate battery level
           r_left(batArray, BAT_ARR_SIZE);                                           // shift battery measurement array
-          batArray[BAT_ARR_SIZE-1] = battery.level(battery.voltage() + dropGap);    // add current measurement to last element, plus battery drop on load                                            
-          
+          batArray[BAT_ARR_SIZE-1] = battery.level(battery.voltage() + dropGap);    // add current measurement to last element, plus battery drop on load
           batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
-          // store battery level in CAN frames data
 
           // Coulomb counter
           coulumb+=ampereArray[AMPERE_ARR_SIZE-1];
           coulumbRound = round(coulumb);
-
-          // coulumbPercentage = 100-(coulumbRound/COULOMB_CAPACITY*100);
-          coulumbPercentage = 100-(coulumbRound*0.001923076923076923);
+          coulumbPercentage = 100 - floor(coulumb*(100.00 / COULOMB_CAPACITY));
           
+          // Store battery level in CAN frames data
           *data581 = batLevel;
           *data781 = batLevel;
           // *data581 = coulumbPercentage;
