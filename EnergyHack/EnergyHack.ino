@@ -4,21 +4,25 @@
 #include "CanFrame.h"
 #include <PinChangeInterrupt.h>
 #include <Battery.h>
+#include <EEPROM.h>
 
 //--------------------------------------------------------------------------
 //--------------------------------------------------------------------------
 // Adjusted parameters
-#define VCC 5160                         // Vcc, measure on arduino
-#define VOLTAGE_DIVIDER 11.86978340310878           // Voltage divider ratio (R1 + R2) / R2 11,03681614675027
-#define AMPERE_SENSOR_OFFSET 512         // 512 by defoult
-#define AMP_DIRECRION -1;                // depends on battery in+/out+ connection; 1/-1
-#define COULOMB_CAPACITY 53560
+//arduino mini
+#define VCC 5160                             // Vcc, measure on arduino
+#define VOLTAGE_DIVIDER 11.86978340310878    // Voltage divider ratio (R1 + R2) / R2 11,03681614675027
+#define AMPERE_SENSOR_OFFSET 512             // 512 by defoult
+#define AMP_DIRECRION -1;                    // depends on battery in+/out+ connection; 1/-1
+#define COULOMB_CAPACITY 45526               // 53560
+
 
 // arduino nano 
-// #define VCC 5080                         // Vcc, measure on arduino
+// #define VCC 5080                          // Vcc, measure on arduino
 // #define VOLTAGE_DIVIDER 11.03681614675027 // Voltage divider ratio (R1 + R2) / R2
-// #define AMPERE_SENSOR_OFFSET 539         // 512 by defoult
-// #define AMP_DIRECRION 1;                // depends on battery in+/out+ connection; 1/-1
+// #define AMPERE_SENSOR_OFFSET 539          // 512 by defoult
+// #define AMP_DIRECRION 1;                  // depends on battery in+/out+ connection; 1/-1
+// #define COULOMB_CAPACITY 53560
 
 
 
@@ -26,7 +30,7 @@
 //#define P 1.1125                       //  1.1125 minimalnie za duzo
 #define P 1.112                          //  1.112 minimalnie za duzo
 #define P 1.1115                         //  to adjust voltage drop gap on load battery
-#define INITIAL_DELAY 500                // time for charging capasitors
+#define INITIAL_DELAY 2000                // time for charging capasitors
 
 //--------------------------------------------------------------------------
 // Initial data
@@ -66,7 +70,7 @@ unsigned long lastMsgTime = 0;
 // Data for check battery level
 #define BAT_MIN 32000
 #define BAT_MAX 41207 
-#define BAT_ARR_SIZE 128                 // battery level array size, must be power of 2
+#define BAT_ARR_SIZE 256                 // battery level array size, must be power of 2
 
 Battery battery(BAT_MIN, BAT_MAX, A2);
 unsigned char batLevel = 0;            // actual percentage battery level
@@ -143,6 +147,13 @@ void setup()
       batArray[i] = battery.level();
     }
 
+    batLevel = calculateAverage(batArray, BAT_ARR_SIZE);     // calculate average
+    if (batLevel > 100)
+    {
+      batLevel = 100;
+    }
+    coulumb = (100-batLevel) * COULOMB_CAPACITY*0.01;
+
     //LEDs
     pinMode(Switch, INPUT_PULLUP);
     pinMode(LED1, OUTPUT);
@@ -155,11 +166,6 @@ void setup()
     digitalWrite(LED3, HIGH);
     digitalWrite(LED4, HIGH);
     digitalWrite(LED5, HIGH);
-
-    batLevel = calculateAverage(batArray, BAT_ARR_SIZE);     // calculate average
-    // checkBattery(batLevel);
-    coulumb = (100-batLevel) * COULOMB_CAPACITY*0.01;
-
     // TODO: uncoment when interupts will works. For now works only on arduino UNO.
     /*
     // attach interrupt
@@ -217,32 +223,42 @@ void loop()
           batArray[BAT_ARR_SIZE-1] = battery.level(battery.voltage() + dropGap);    // add current measurement to last element, plus battery drop on load
           batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
 
-          // Coulomb counter
+          // Coulomb counter 0 <-> COULOMB_CAPACITY
           coulumb+=ampereArray[AMPERE_ARR_SIZE-1];
-          coulumbRound = round(coulumb);
+          if (coulumb <= 0)
+            coulumbRound = 0;
+          else if (coulumb >= COULOMB_CAPACITY)
+            coulumbRound = COULOMB_CAPACITY;
+          else
+            coulumbRound = round(coulumb);
+            
+          // Clculate percentage from coulomb counter
           coulumbPercentage = 100 - floor(coulumb*(100.00 / COULOMB_CAPACITY));
-          
+
           // Store battery level in CAN frames data
-          *data581 = batLevel;
-          *data781 = batLevel;
-          // *data581 = coulumbPercentage;
-          // *data781 = coulumbPercentage;
+          *data581 = coulumbPercentage;
+          *data781 = coulumbPercentage;
 
           // TMP just to check battery capacity
           // store Coulomb counter value in CAN 591 frame data
-          *(data591+0) = coulumbPercentage;
+          *(data591+0) = batLevel;
           *(data591+1) = 0x00;
           *(data591+2) = 0x00;
           *(data591+3) = lowByte(coulumbRound);
           *(data591+4) = highByte(coulumbRound);
 
-          if(avgAmpereValue <= -2.00)  //   charging
+          if(ampereArray[AMPERE_ARR_SIZE-1] <= -0.5)  //   charging
           {
             charging(chargingIter);
             if (chargingIter<5)
               chargingIter++;
-            else 
+            else
               chargingIter=0;
+          }
+          else
+          {
+            chargingIter=0;
+            charging(chargingIter);
           }
         }
 
