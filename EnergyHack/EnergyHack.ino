@@ -13,8 +13,12 @@
 #define VCC 5160                             // Vcc, measure on arduino
 #define VOLTAGE_DIVIDER 11.86978340310878    // Voltage divider ratio (R1 + R2) / R2 11,03681614675027
 #define AMPERE_SENSOR_OFFSET 512             // 512 by defoult
-#define AMP_DIRECRION -1;                    // depends on battery in+/out+ connection; 1/-1
-#define COULOMB_CAPACITY 45526               // 53560
+#define AMP_DIRECRION -1;                    // current direction, depends on battery in+/out+ connection; 1/-1
+// #define COULOMB_CAPACITY 53560               // za dużo odłączyło przy ok 14%
+// #define COULOMB_CAPACITY 45526               // za mało mialo 10%, powinno ok 19%
+// #define COULOMB_CAPACITY 50079               //przy 10% ok 30.8V
+// #define COULOMB_CAPACITY 45294                //przy 37% ok36.1V
+#define COULOMB_CAPACITY 47000
 
 
 // arduino nano 
@@ -30,7 +34,7 @@
 //#define P 1.1125                       //  1.1125 minimalnie za duzo
 #define P 1.112                          //  1.112 minimalnie za duzo
 #define P 1.1115                         //  to adjust voltage drop gap on load battery
-#define INITIAL_DELAY 2000                // time for charging capasitors
+#define INITIAL_DELAY 3000                // time for charging capasitors
 
 //--------------------------------------------------------------------------
 // Initial data
@@ -68,8 +72,8 @@ unsigned long lastMsgTime = 0;
 
 //--------------------------------------------------------------------------
 // Data for check battery level
-#define BAT_MIN 32000
-#define BAT_MAX 41207 
+#define BAT_MIN 31000
+#define BAT_MAX 41000
 #define BAT_ARR_SIZE 256                 // battery level array size, must be power of 2
 
 Battery battery(BAT_MIN, BAT_MAX, A2);
@@ -78,7 +82,7 @@ unsigned int batArray[BAT_ARR_SIZE];
 
 //--------------------------------------------------------------------------
 // Data for current mearsurement
-#define AMPERE_ARR_SIZE 16              // current array size, must be power of 2
+#define AMPERE_ARR_SIZE 4               // current array size, must be power of 2
 
 int chargingIter = 0;                   // for LED blinking while charging
 int ampereSensorPin = A0;
