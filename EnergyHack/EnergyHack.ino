@@ -1,3 +1,13 @@
+#include <mcp_can.h>
+#include <mcp_can_dfs.h>
+
+#include <Battery.h>
+
+#include <PinChangeInterrupt.h>
+#include <PinChangeInterruptBoards.h>
+#include <PinChangeInterruptPins.h>
+#include <PinChangeInterruptSettings.h>
+
 #include <SPI.h>
 #include "mcp_can.h"
 #include <avr/sleep.h>
@@ -18,7 +28,10 @@
 // #define COULOMB_CAPACITY 45526               // za mało mialo 10%, powinno ok 19%
 // #define COULOMB_CAPACITY 50079               //przy 10% ok 30.8V
 // #define COULOMB_CAPACITY 45294                //przy 37% ok36.1V
-#define COULOMB_CAPACITY 47000
+// #define COULOMB_CAPACITY 53000
+// #define COULOMB_CAPACITY 56000
+// #define COULOMB_CAPACITY 53500
+#define COULOMB_CAPACITY 47500
 
 
 // arduino nano 
@@ -32,8 +45,9 @@
 
 
 //#define P 1.1125                       //  1.1125 minimalnie za duzo
-#define P 1.112                          //  1.112 minimalnie za duzo
+//#define P 1.112                        //  1.112 minimalnie za duzo
 #define P 1.1115                         //  to adjust voltage drop gap on load battery
+#define P 1.11175                        //  to adjust voltage drop gap on load battery
 #define INITIAL_DELAY 3000                // time for charging capasitors
 
 //--------------------------------------------------------------------------
@@ -82,7 +96,7 @@ unsigned int batArray[BAT_ARR_SIZE];
 
 //--------------------------------------------------------------------------
 // Data for current mearsurement
-#define AMPERE_ARR_SIZE 4               // current array size, must be power of 2
+#define AMPERE_ARR_SIZE 16               // current array size, must be power of 2
 
 int chargingIter = 0;                   // for LED blinking while charging
 int ampereSensorPin = A0;
@@ -95,9 +109,12 @@ double ampereArray[AMPERE_ARR_SIZE];
 
 //--------------------------------------------------------------------------
 // Data for coulomb counter
+#define COULOMB_AMPERE_ARR_SIZE 4               // current coulomb array size, must be power of 2
 double coulumb = 0;
 unsigned int coulumbRound = 0;
 unsigned char  coulumbPercentage = 0;
+double avgCoulAmpereValue = 0;
+double coulAmpereArray[COULOMB_AMPERE_ARR_SIZE];
 
 //--------------------------------------------------------------------------
 // Data for drop voltage equation
@@ -228,7 +245,10 @@ void loop()
           batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
 
           // Coulomb counter 0 <-> COULOMB_CAPACITY
-          coulumb+=ampereArray[AMPERE_ARR_SIZE-1];
+          r_left_double(coulAmpereArray, COULOMB_AMPERE_ARR_SIZE);
+          coulAmpereArray[COULOMB_AMPERE_ARR_SIZE-1] = ampereArray[AMPERE_ARR_SIZE-1];
+          avgCoulAmpereValue = calculateAverage_double(coulAmpereArray, COULOMB_AMPERE_ARR_SIZE);
+          coulumb+=avgCoulAmpereValue;
           if (coulumb <= 0)
             coulumbRound = 0;
           else if (coulumb >= COULOMB_CAPACITY)
@@ -240,13 +260,15 @@ void loop()
           coulumbPercentage = 100 - floor(coulumb*(100.00 / COULOMB_CAPACITY));
 
           // Store battery level in CAN frames data
-          *data581 = coulumbPercentage;
-          *data781 = coulumbPercentage;
+          //*data581 = coulumbPercentage; //use bat level from coulomb counter
+          //*data781 = coulumbPercentage;
+          *data581 = batLevel; //use bat level from voltage meter
+          *data781 = batLevel;
 
           // TMP just to check battery capacity
           // store Coulomb counter value in CAN 591 frame data
-          *(data591+0) = batLevel;
-          *(data591+1) = 0x00;
+          *(data591+0) = 0x00;
+          *(data591+1) = batLevel;
           *(data591+2) = 0x00;
           *(data591+3) = lowByte(coulumbRound);
           *(data591+4) = highByte(coulumbRound);
