@@ -115,7 +115,9 @@ double coulAmpereArray[COULOMB_AMPERE_ARR_SIZE];
 // double ax2 = AX2 * P;
 // double bx = BX * P;
 // double c = C * P;
-#define P 2
+// #define P 2 // za dużo ok 5-6%
+#define P 1.5
+
 #define AX 177.4866
 #define B 4
 
@@ -212,7 +214,7 @@ void loop()
     // Voltage measurement and calculate battery level
     batteryVoltage = battery.voltage();
     r_left(batArray, BAT_ARR_SIZE);                                           // shift battery measurement array
-    batArray[BAT_ARR_SIZE-1] = battery.level(batteryVoltage + dropGap);    // add current measurement to last element, plus battery drop on load
+    batArray[BAT_ARR_SIZE-1] = battery.level(batteryVoltage + dropGap);       // add current measurement to last element, plus battery drop on load
     batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
 
     // Coulomb counter 0 <-> COULOMB_CAPACITY
@@ -230,8 +232,8 @@ void loop()
     // Clculate percentage from coulomb counter, not use for now
     coulumbPercentage = 100 - floor(coulumb*(100.00 / COULOMB_CAPACITY));
 
-     data781[0] = battery.level(batteryVoltage + dropGap);
-    //  data781[0] = batLevel;
+    //  data781[0] = battery.level(batteryVoltage + dropGap);
+     data781[0] = batLevel;
           
     data782[3] = lowByte(batteryVoltage);
     data782[2] = highByte(batteryVoltage);
@@ -318,6 +320,12 @@ void loop()
         frame784.sendCAN(CAN);
         break;
 //charging
+      // case 0x7C0:
+      //   frame780.sendCAN(CAN);
+      //   frame781.sendCAN(CAN);
+      //   frame782.sendCAN(CAN);
+      //   frame784.sendCAN(CAN);
+      //   break;
       // case 0x2EC:
       //   frame580.sendCAN(CAN);
       //   frame581.sendCAN(CAN);
