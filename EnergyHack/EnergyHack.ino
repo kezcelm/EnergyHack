@@ -116,7 +116,9 @@ double coulAmpereArray[COULOMB_AMPERE_ARR_SIZE];
 // double bx = BX * P;
 // double c = C * P;
 // #define P 2 // za dużo ok 5-6%
-#define P 1.5
+// #define P 1.7   // za dużo
+// #define P 1.5      // za malo
+#define P 1.6
 
 #define AX 177.4866
 #define B 4
@@ -233,14 +235,16 @@ void loop()
     coulumbPercentage = 100 - floor(coulumb*(100.00 / COULOMB_CAPACITY));
 
     //  data781[0] = battery.level(batteryVoltage + dropGap);
-     data781[0] = batLevel;
+    data781[0] = batLevel;
           
-    data782[3] = lowByte(batteryVoltage);
-    data782[2] = highByte(batteryVoltage);
-    miliAmperValue = avgAmpereValue*10000;
-    data782[1] = lowByte(miliAmperValue);
-    data782[0] = highByte(miliAmperValue);
-
+    data782[3] = highByte(batteryVoltage);
+    data782[2] = lowByte(batteryVoltage);
+    Serial.println(batteryVoltage);
+    miliAmperValue = abs(avgAmpereValue)*10000;
+    data782[1] = highByte(miliAmperValue);
+    data782[0] = lowByte(miliAmperValue);
+frame781.sendCAN(CAN);
+frame782.sendCAN(CAN);
     // if (batLevel>=100){ //stop chargingwhen D1/D2 = D3/D4???
     //    data781[1] = 0xE3;
     //    data781[2] = 0x3D;
@@ -322,28 +326,6 @@ void loop()
 //charging
       // case 0x7C0:
       //   frame780.sendCAN(CAN);
-      //   frame781.sendCAN(CAN);
-      //   frame782.sendCAN(CAN);
-      //   frame784.sendCAN(CAN);
-      //   break;
-      // case 0x2EC:
-      //   frame580.sendCAN(CAN);
-      //   frame581.sendCAN(CAN);
-      //   frame582.sendCAN(CAN);
-      //   frame583.sendCAN(CAN);
-      //   Serial.println(data580[0]);
-      //   Serial.println(data580[1]);
-      //   Serial.println(data580[2]);
-      //   break;
-      // case 0x3C0:
-      //   frame780.sendCAN(CAN);
-      //   frame781.sendCAN(CAN);
-      //   frame782.sendCAN(CAN);
-      //   frame783.sendCAN(CAN);
-      //   frame784.sendCAN(CAN);
-      //   break;
-      // case 0x7C0:
-      //   frame780.sendCAN(CAN);
       //   break;
       // case 0x7C1:
       //   frame781.sendCAN(CAN);
@@ -352,6 +334,12 @@ void loop()
       //   frame782.sendCAN(CAN);
       //   frame783.sendCAN(CAN);
       //   frame784.sendCAN(CAN);
+      //   break;
+      // case 0x2EC:
+      //   frame580.sendCAN(CAN);
+      //   frame581.sendCAN(CAN);
+      //   frame582.sendCAN(CAN);
+      //   frame583.sendCAN(CAN);
       //   break;
       default:
         break;
