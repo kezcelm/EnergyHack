@@ -118,7 +118,8 @@ double coulAmpereArray[COULOMB_AMPERE_ARR_SIZE];
 // #define P 2 // za dużo ok 5-6%
 // #define P 1.7   // za dużo
 // #define P 1.5      // za malo
-#define P 1.6
+// #define P 1.6   // za dużo ok 1-2%
+#define P 1.57
 
 #define AX 177.4866
 #define B 4
@@ -243,8 +244,7 @@ void loop()
     miliAmperValue = abs(avgAmpereValue)*10000;
     data782[1] = highByte(miliAmperValue);
     data782[0] = lowByte(miliAmperValue);
-frame781.sendCAN(CAN);
-frame782.sendCAN(CAN);
+
     // if (batLevel>=100){ //stop chargingwhen D1/D2 = D3/D4???
     //    data781[1] = 0xE3;
     //    data781[2] = 0x3D;
