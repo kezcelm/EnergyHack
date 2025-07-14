@@ -85,7 +85,7 @@ unsigned int batteryVoltage;
 
 //--------------------------------------------------------------------------
 // Data for current mearsurement
-#define AMPERE_ARR_SIZE 4               // current array size, must be power of 2
+#define AMPERE_ARR_SIZE 8               // current array size, must be power of 2
 
 int chargingIter = 0;                   // for LED blinking while charging
 int ampereSensorPin = A0;
@@ -99,7 +99,7 @@ double ampereArray[AMPERE_ARR_SIZE];
 
 //--------------------------------------------------------------------------
 // Data for coulomb counter
-#define COULOMB_AMPERE_ARR_SIZE 4               // current coulomb array size, must be power of 2
+#define COULOMB_AMPERE_ARR_SIZE 8               // current coulomb array size, must be power of 2
 double coulumb = 0;
 unsigned int coulumbRound = 0;
 unsigned char  coulumbPercentage = 0;
@@ -119,7 +119,9 @@ double coulAmpereArray[COULOMB_AMPERE_ARR_SIZE];
 // #define P 1.7   // za dużo
 // #define P 1.5      // za malo
 // #define P 1.6   // za dużo ok 1-2%
-#define P 1.57
+// #define P 1.57  // za dużo
+// #define P 1.53  // za dużo 
+#define P 1.515
 
 #define AX 177.4866
 #define B 4
