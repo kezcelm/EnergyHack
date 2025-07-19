@@ -96,21 +96,8 @@ int miliAmperValue = 0;
 
 double ampereArray[AMPERE_ARR_SIZE];
 
-
-//--------------------------------------------------------------------------
-// Data for coulomb counter
-#define COULOMB_AMPERE_ARR_SIZE 8               // current coulomb array size, must be power of 2
-double coulumb = 0;
-unsigned int coulumbRound = 0;
-unsigned char  coulumbPercentage = 0;
-double avgCoulAmpereValue = 0;
-double coulAmpereArray[COULOMB_AMPERE_ARR_SIZE];
-
 //--------------------------------------------------------------------------
 // Data for drop voltage equation
-// #define AX2 -3.3567     // base values for ax2 + bx + c equation
-// #define BX 193.5095
-// #define C -1.3374
 
 // double ax2 = AX2 * P;
 // double bx = BX * P;
@@ -176,7 +163,6 @@ void setup()
     {
       batLevel = 100;
     }
-    coulumb = (100-batLevel) * COULOMB_CAPACITY*0.01;
 
     //LEDs
     pinMode(Switch, INPUT_PULLUP);
@@ -203,6 +189,7 @@ void loop()
   lastBusActivity = millis();
   actTime = millis();
   if (actTime - prevTime >= 1000UL)    // read battery level in every 1s
+  // if (actTime - prevTime >= 2500UL)    // read battery level in every 2.5s
 
   {
     prevTime = actTime;
@@ -211,9 +198,6 @@ void loop()
     r_left_double(ampereArray, AMPERE_ARR_SIZE);
     ampereArray[AMPERE_ARR_SIZE-1] = (((analogRead(ampereSensorPin) - AMPERE_SENSOR_OFFSET)/25.6)+0.7)*AMP_DIRECRION;
     avgAmpereValue = calculateAverage_double(ampereArray, AMPERE_ARR_SIZE);
-    // dropGap = ax2*avgAmpereValue*avgAmpereValue + 
-    //           bx*avgAmpereValue +
-    //           c;
     dropGap = ax*avgAmpereValue + b;   // linear f(x) = Ax + B
 
     // Voltage measurement and calculate battery level
@@ -221,21 +205,6 @@ void loop()
     r_left(batArray, BAT_ARR_SIZE);                                           // shift battery measurement array
     batArray[BAT_ARR_SIZE-1] = battery.level(batteryVoltage + dropGap);       // add current measurement to last element, plus battery drop on load
     batLevel = calculateAverage(batArray, BAT_ARR_SIZE);                      // calculate average
-
-    // Coulomb counter 0 <-> COULOMB_CAPACITY
-    r_left_double(coulAmpereArray, COULOMB_AMPERE_ARR_SIZE);
-    coulAmpereArray[COULOMB_AMPERE_ARR_SIZE-1] = ampereArray[AMPERE_ARR_SIZE-1];
-    avgCoulAmpereValue = calculateAverage_double(coulAmpereArray, COULOMB_AMPERE_ARR_SIZE);
-    coulumb+=avgCoulAmpereValue;
-    if (coulumb <= 0)
-      coulumbRound = 0;
-    else if (coulumb >= COULOMB_CAPACITY)
-      coulumbRound = COULOMB_CAPACITY;
-    else
-      coulumbRound = round(coulumb);
-
-    // Clculate percentage from coulomb counter, not use for now
-    coulumbPercentage = 100 - floor(coulumb*(100.00 / COULOMB_CAPACITY));
 
     //  data781[0] = battery.level(batteryVoltage + dropGap);
     data781[0] = batLevel;
