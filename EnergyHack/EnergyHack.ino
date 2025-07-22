@@ -76,7 +76,7 @@ unsigned long lastMsgTime = 0;
 // Data for check battery level
 #define BAT_MIN 31000
 #define BAT_MAX 41000
-#define BAT_ARR_SIZE 256                 // battery level array size, must be power of 2
+#define BAT_ARR_SIZE 512                 // battery level array size, must be power of 2
 
 Battery battery(BAT_MIN, BAT_MAX, A2);
 unsigned char batLevel = 0;            // actual percentage battery level
