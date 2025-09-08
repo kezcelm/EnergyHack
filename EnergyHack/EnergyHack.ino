@@ -108,7 +108,11 @@ double ampereArray[AMPERE_ARR_SIZE];
 // #define P 1.6   // za dużo ok 1-2%
 // #define P 1.57  // za dużo
 // #define P 1.53  // za dużo 
-#define P 1.515
+// #define P 1.515    // minimalnie za dużo przy AMPERE_ARR_SIZE 8
+// #define P 1.505    // minimalnie za dużo przy AMPERE_ARR_SIZE 8
+// #define P 1.502    // minimalnie za dużo przy AMPERE_ARR_SIZE 8
+// #define P 1.5         // minimalnie za dużo przy AMPERE_ARR_SIZE 8
+#define P 1.48
 
 #define AX 177.4866
 #define B 4
